@@ -6,28 +6,27 @@ A Flume sink using Apache Cassandra
 Cassandra Schema
 ----------------
 
-`
-create keyspace logs with
-   strategy_options = {datacenter1:1}
-;
+    create keyspace logs with
+       strategy_options = {datacenter1:1}
+    ;
 
-use logs;
+    use logs;
 
-create column family records with
-   comparator = UTF8Type
-   and gc_grace = 86400
-   and column_metadata = [
-     {column_name: ts, validation_class: LongType, index_type: KEYS}
-     {column_name: src, validation_class: UTF8Type, index_type: KEYS}
-     {column_name: host, validation_class: UTF8Type, index_type: KEYS}
-   ]
-;
+    create column family records with
+       comparator = UTF8Type
+       and gc_grace = 86400
+       and column_metadata = [
+         {column_name: ts, validation_class: LongType, index_type: KEYS}
+         {column_name: src, validation_class: UTF8Type, index_type: KEYS}
+         {column_name: host, validation_class: UTF8Type, index_type: KEYS}
+       ]
+    ;
 
-create column family hours with
-   comparator = TimeUUIDType
-   and gc_grace = 86400
-;
-`
+    create column family hours with
+       comparator = TimeUUIDType
+       and gc_grace = 86400
+    ;
+
 
 Sample Flume config
 -------------
@@ -62,4 +61,3 @@ agent.sinks.cassandraSink.hosts = localhost
 agent.sinks.cassandraSink.cluster-name = Logging
 agent.sinks.cassandraSink.keyspace-name = logs
 agent.sinks.cassandraSink.max-conns-per-host = 2
-`
