@@ -18,6 +18,9 @@
 
 package org.apache.flume.sink.cassandra;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.FileReader;
@@ -28,6 +31,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.cassandra.cli.CliMain;
 import org.apache.flume.Context;
@@ -41,232 +45,252 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormatterBuilder;
-import org.joda.time.format.ISODateTimeFormat;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 public class TestCassandraSink {
-	private static final String CASSANDRA_HOST = "localhost";
-	private static final int CASSANDRA_PORT = 9170;
+    private static final String CASSANDRA_HOST = "localhost";
+    private static final int CASSANDRA_PORT = 9170;
 
-	private static final DateTimeFormatter dfHourKey = new DateTimeFormatterBuilder()
-			.appendYear(4, 4).appendMonthOfYear(2).appendDayOfMonth(2)
-			.appendHourOfDay(2).toFormatter();
-	private static final DateTimeFormatter dfEvent = ISODateTimeFormat
-			.dateTime().withOffsetParsed();
+    private static final DateTimeFormatter dfHourKey = new DateTimeFormatterBuilder().appendYear(4, 4)
+            .appendMonthOfYear(2).appendDayOfMonth(2).appendHourOfDay(2).toFormatter();
 
-	private Context sinkContext;
-	private MemoryChannel channel;
-	private CassandraSink sink;
+    private Context sinkContext;
+    private MemoryChannel channel;
+    private CassandraSink sink;
 
-	@Test
-	public void testConfigure() {
-		sinkContext.put("hosts", "host1,host2,host3");
-		sinkContext.put("port", "9161");
-		sinkContext.put("cluster-name", "clus1");
-		sinkContext.put("keyspace-name", "ks1");
-		sinkContext.put("hours-colfam", "hrs");
-		sinkContext.put("records-colfam", "recs");
-		sinkContext.put("socket-timeout-millis", "1234");
-		sinkContext.put("max-conns-per-host", "12");
-		sinkContext.put("max-exhausted-wait-millis", "5678");
+    @Test
+    public void testConfigure() {
+        sinkContext.put("hosts", "host1,host2,host3");
+        sinkContext.put("port", "9161");
+        sinkContext.put("cluster-name", "clus1");
+        sinkContext.put("keyspace-name", "ks1");
+        sinkContext.put("hours-colfam", "hrs");
+        sinkContext.put("records-colfam", "recs");
+        sinkContext.put("socket-timeout-millis", "1234");
+        sinkContext.put("max-conns-per-host", "12");
+        sinkContext.put("max-exhausted-wait-millis", "5678");
 
-		Configurables.configure(sink, sinkContext);
+        Configurables.configure(sink, sinkContext);
 
-		CassandraSinkRepository repos = sink.getRepository();
+        CassandraSinkRepository repos = sink.getRepository();
 
-		assertEquals("host1,host2,host3", repos.getHosts());
-		assertEquals(9161, repos.getPort());
-		assertEquals("clus1", repos.getClusterName());
-		assertEquals("ks1", repos.getKeyspaceName());
-		assertEquals("hrs", repos.getHoursColFamName());
-		assertEquals("recs", repos.getRecordsColFamName());
-		assertEquals(1234, repos.getSocketTimeoutMillis());
-		assertEquals(12, repos.getMaxConnectionsPerHost());
-		assertEquals(5678, repos.getMaxExhaustedWaitMillis());
+        assertEquals("host1,host2,host3", repos.getHosts());
+        assertEquals(9161, repos.getPort());
+        assertEquals("clus1", repos.getClusterName());
+        assertEquals("ks1", repos.getKeyspaceName());
+        assertEquals("hrs", repos.getHoursColFamName());
+        assertEquals("recs", repos.getRecordsColFamName());
+        assertEquals(1234, repos.getSocketTimeoutMillis());
+        assertEquals(12, repos.getMaxConnectionsPerHost());
+        assertEquals(5678, repos.getMaxExhaustedWaitMillis());
 
-		assertEquals(channel, sink.getChannel());
-		assertEquals(LifecycleState.IDLE, sink.getLifecycleState());
-	}
+        assertEquals(channel, sink.getChannel());
+        assertEquals(LifecycleState.IDLE, sink.getLifecycleState());
+    }
 
-	// @Test
-	// public void testBadConfiguration()
-	// {
-	// fail();
-	// }
+    // @Test
+    // public void testBadConfiguration()
+    // {
+    // fail();
+    // }
 
-	@Test
-	public void testProcessing() throws Exception {
-		int numEvents = 20;
+    @Test
+    public void testProcessing() throws Exception {
+        int numEvents = 20;
 
-		// setup events
-		List<Event> eventList = new ArrayList<Event>(numEvents);
-		DateTime baseTime = dfEvent
-				.parseDateTime("2012-07-04T16:15:56.123-07:00");
-		for (int i = 0; i < numEvents; i++) {
-			String timeAsStr = String.valueOf(baseTime.plusMinutes(10 * i).getMillis());
+        // setup events
+        List<Event> eventList = new ArrayList<Event>(numEvents);
+        DateTime baseTime = new DateTime();
+        for (int i = 0; i < numEvents; i++) {
+            String timeAsStr = String.valueOf(baseTime.plusMinutes(10 * i).getMillis()*1000);
 
-			Map<String, String> headerMap = new HashMap<String, String>();
-			headerMap.put("time", timeAsStr);
-			headerMap.put("src", "src1");
-			headerMap.put("host", "host1");
+            Map<String, String> headerMap = new HashMap<String, String>();
+            headerMap.put(FlumeLogEvent.HEADER_TIMESTAMP, timeAsStr);
+            headerMap.put(FlumeLogEvent.HEADER_SOURCE, "src1");
+            headerMap.put(FlumeLogEvent.HEADER_HOST, "host1");
 
-			eventList.add(EventBuilder.withBody(("test event " + i).getBytes(),
-					headerMap));
-		}
+            eventList.add(EventBuilder.withBody(("test event " + i).getBytes(), headerMap));
+        }
 
-		sink.start();
-		assertEquals(LifecycleState.START, sink.getLifecycleState());
+        sink.start();
+        assertEquals(LifecycleState.START, sink.getLifecycleState());
 
-		// create event
+        // put event in channel
+        Transaction transaction = channel.getTransaction();
+        transaction.begin();
+        for (Event event : eventList) {
+            channel.put(event);
+        }
+        transaction.commit();
+        transaction.close();
 
-		// put event in channel
-		Transaction transaction = channel.getTransaction();
-		transaction.begin();
-		for (Event event : eventList) {
-			channel.put(event);
-		}
-		transaction.commit();
-		transaction.close();
+        sink.process();
 
-		sink.process();
+        // check cassandra for data
+        checkCass(eventList);
 
-		// check cassandra for data
-		checkCass(eventList);
+        sink.stop();
+        assertEquals(LifecycleState.STOP, sink.getLifecycleState());
+    }
 
-		sink.stop();
-		assertEquals(LifecycleState.STOP, sink.getLifecycleState());
-	}
+    @Test
+    public void testProcessingMissingHeaders() throws Exception {
+        int numEvents = 20;
 
-	// ----------------------
+        // setup events
+        List<Event> eventList = new ArrayList<Event>(numEvents);
+        for (int i = 0; i < numEvents; i++) {
+            eventList.add(EventBuilder.withBody(("test event " + i).getBytes()));
+        }
 
-	private void checkCass(List<Event> eventList) {
-		for (Event event : eventList) {
-			DateTime dt = dfEvent.parseDateTime(event.getHeaders().get("time"))
-					.withZone(DateTimeZone.UTC);
-			String cassKey = dfHourKey.print(dt);
-			List<LogEvent> retrievedEvents = sink.getRepository()
-					.getEventsForHour(cassKey);
+        sink.start();
+        assertEquals(LifecycleState.START, sink.getLifecycleState());
 
-			boolean found = false;
-			for (LogEvent logEvent : retrievedEvents) {
-				if (Arrays.equals(event.getBody(), logEvent.getData())) {
-					found = true;
-					break;
-				}
-			}
+        // put event in channel
+        Transaction transaction = channel.getTransaction();
+        transaction.begin();
+        for (Event event : eventList) {
+            channel.put(event);
+        }
+        transaction.commit();
+        transaction.close();
 
-			assertTrue(found);
-		}
+        sink.process();
 
-	}
+        // check cassandra for data
+        checkCass(eventList);
 
-	@Before
-	public void setupTest() throws Exception {
-		Context channelContext = new Context();
-		channelContext.put("capacity", "100");
-		channelContext.put("transactionCapacity", "100");
+        sink.stop();
+        assertEquals(LifecycleState.STOP, sink.getLifecycleState());
+    }
 
-		channel = new MemoryChannel();
-		channel.setName("junitChannel");
-		Configurables.configure(channel, channelContext);
+    // ----------------------
 
-		sinkContext = new Context();
-		sinkContext.put("hosts", CASSANDRA_HOST);
-		sinkContext.put("port", String.valueOf(CASSANDRA_PORT));
-		sinkContext.put("cluster-name", "Logging");
-		sinkContext.put("keyspace-name", "logs");
-		sinkContext.put("max-conns-per-host", "1");
+    private void checkCass(List<Event> eventList) {
+        for (Event event : eventList) {
+            DateTime dt = new DateTime(TimeUnit.MICROSECONDS.toMillis(Long.parseLong(event.getHeaders().get(FlumeLogEvent.HEADER_TIMESTAMP))))
+                    .withZone(DateTimeZone.UTC);
+            String cassKey = dfHourKey.print(dt);
+            List<LogEvent> retrievedEvents = sink.getRepository().getEventsForHour(cassKey);
 
-		sink = new CassandraSink();
-		Configurables.configure(sink, sinkContext);
-		sink.setChannel(channel);
+            boolean found = false;
+            for (LogEvent logEvent : retrievedEvents) {
+                if (Arrays.equals(event.getBody(), logEvent.getData())) {
+                    found = true;
+                    break;
+                }
+            }
 
-		// configure cassandra keyspace
-		createKeyspaceFromCliFile(this.getClass()
-				.getResource("/cassandra-schema.txt").getFile());
-	}
+            assertTrue(found);
+        }
+    }
 
-	protected void createKeyspaceFromCliFile(String fileName) throws Exception {
-		// new error/output streams for CliSessionState
-		ByteArrayOutputStream errStream = new ByteArrayOutputStream();
-		ByteArrayOutputStream outStream = new ByteArrayOutputStream();
+    @Before
+    public void setupTest() throws Exception {
+        Context channelContext = new Context();
+        channelContext.put("capacity", "100");
+        channelContext.put("transactionCapacity", "100");
 
-		// checking if we can connect to the running cassandra node on localhost
-		CliMain.connect(CASSANDRA_HOST, CASSANDRA_PORT);
+        channel = new MemoryChannel();
+        channel.setName("junitChannel");
+        Configurables.configure(channel, channelContext);
 
-		try {
-			// setting new output stream
-			CliMain.sessionState.setOut(new PrintStream(outStream));
-			CliMain.sessionState.setErr(new PrintStream(errStream));
+        sinkContext = new Context();
+        sinkContext.put("hosts", CASSANDRA_HOST);
+        sinkContext.put("port", String.valueOf(CASSANDRA_PORT));
+        sinkContext.put("cluster-name", "Logging");
+        sinkContext.put("keyspace-name", "logs");
+        sinkContext.put("max-conns-per-host", "1");
 
-			// read schema from file
-			BufferedReader fr = new BufferedReader(new FileReader(fileName));
-			String line = null;
-			StringBuffer sb = new StringBuffer();
-			while (null != (line = fr.readLine())) {
-				line = line.trim();
-				if (line.startsWith("#")) {
-					continue;
-				} else if (line.startsWith("quit")) {
-					break;
-				}
+        sink = new CassandraSink();
+        Configurables.configure(sink, sinkContext);
+        sink.setChannel(channel);
 
-				sb.append(line);
-				sb.append(' ');
-				if (line.endsWith(";")) {
-					try {
-						CliMain.processStatement(sb.toString());
-						// String result = outStream.toString();
-						outStream.toString();
+        // configure cassandra keyspace
+        createKeyspaceFromCliFile(this.getClass().getResource("/cassandra-schema.txt").getFile());
+    }
 
-						outStream.reset(); // reset stream so we have only
-											// output
-											// from
-											// next statement all the time
-						errStream.reset(); // no errors to the end user.
-					} catch (Throwable e) {
-						e.printStackTrace();
-					}
+    protected void createKeyspaceFromCliFile(String fileName) throws Exception {
+        // new error/output streams for CliSessionState
+        ByteArrayOutputStream errStream = new ByteArrayOutputStream();
+        ByteArrayOutputStream outStream = new ByteArrayOutputStream();
 
-					sb = new StringBuffer();
-				}
-			}
-		} finally {
-			if (CliMain.isConnected()) {
-				CliMain.disconnect();
-			}
-		}
-	}
+        // checking if we can connect to the running cassandra node on localhost
+        CliMain.connect(CASSANDRA_HOST, CASSANDRA_PORT);
 
-	@BeforeClass
-	public static void setupCassandra() throws Exception {
-		EmbeddedServerHelper helper = new EmbeddedServerHelper(
-				"/cassandra-junit.yaml");
-		helper.setup();
+        try {
+            // setting new output stream
+            CliMain.sessionState.setOut(new PrintStream(outStream));
+            CliMain.sessionState.setErr(new PrintStream(errStream));
 
-		// make sure startup finished and can cannect
-		for (int i = 0; i < 10; i++) {
-			try {
-				CliMain.connect("localhost", 9170);
-				CliMain.disconnect();
-				break;
-			} catch (Throwable e) {
-				// wait, then retry
-				Thread.sleep(100);
-			}
-		}
-	}
+            // read schema from file
+            BufferedReader fr = new BufferedReader(new FileReader(fileName));
+            String line = null;
+            StringBuffer sb = new StringBuffer();
+            while (null != (line = fr.readLine())) {
+                line = line.trim();
+                if (line.startsWith("#")) {
+                    continue;
+                }
+                else if (line.startsWith("quit")) {
+                    break;
+                }
 
-	@AfterClass
-	public static void teardown() throws IOException {
-		EmbeddedServerHelper.teardown();
+                sb.append(line);
+                sb.append(' ');
+                if (line.endsWith(";")) {
+                    try {
+                        CliMain.processStatement(sb.toString());
+                        // String result = outStream.toString();
+                        outStream.toString();
 
-	}
+                        outStream.reset(); // reset stream so we have only
+                                           // output
+                                           // from
+                                           // next statement all the time
+                        errStream.reset(); // no errors to the end user.
+                    }
+                    catch (Throwable e) {
+                        e.printStackTrace();
+                    }
+
+                    sb = new StringBuffer();
+                }
+            }
+        }
+        finally {
+            if (CliMain.isConnected()) {
+                CliMain.disconnect();
+            }
+        }
+    }
+
+    @BeforeClass
+    public static void setupCassandra() throws Exception {
+        EmbeddedServerHelper helper = new EmbeddedServerHelper("/cassandra-junit.yaml");
+        helper.setup();
+
+        // make sure startup finished and can cannect
+        for (int i = 0; i < 10; i++) {
+            try {
+                CliMain.connect("localhost", 9170);
+                CliMain.disconnect();
+                break;
+            }
+            catch (Throwable e) {
+                // wait, then retry
+                Thread.sleep(100);
+            }
+        }
+    }
+
+    @AfterClass
+    public static void teardown() throws IOException {
+        EmbeddedServerHelper.teardown();
+
+    }
 
 }

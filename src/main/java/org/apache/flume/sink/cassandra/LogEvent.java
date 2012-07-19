@@ -22,22 +22,36 @@ import org.joda.time.DateTime;
 
 public class LogEvent
 {
-	private final DateTime time;
-	private final byte[] data;
+	private final DateTime timestamp;
+	private final String source;
+	private final String host;
 
-	public LogEvent(long time, byte[] data)
+    private final byte[] data;
+
+	public LogEvent(long time, String source, String host, byte[] data)
 	{
-		this.time = new DateTime(time);
+		this.timestamp = new DateTime(time);
+		this.source = source;
+		this.host = host;
 		this.data = data;
 	}
 
-	public DateTime getTime()
+	public DateTime getTimestamp()
 	{
-		return time;
+		return timestamp;
 	}
 
-	public byte[] getData()
+    public String getSource() {
+        return source;
+    }
+
+    public String getHost() {
+        return host;
+    }
+
+    public byte[] getData()
 	{
 		return data;
 	}
+
 }

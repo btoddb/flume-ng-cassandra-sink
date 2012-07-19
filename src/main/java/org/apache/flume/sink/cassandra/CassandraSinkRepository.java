@@ -24,8 +24,8 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import me.prettyprint.cassandra.connection.SpeedForJOpTimer;
 import me.prettyprint.cassandra.serializers.ByteBufferSerializer;
@@ -60,10 +60,10 @@ import org.slf4j.LoggerFactory;
 public class CassandraSinkRepository {
     private static final Logger logger = LoggerFactory.getLogger(CassandraSinkRepository.class);
 
-    // private static DateTimeFormatter dfEvent = ISODateTimeFormat.dateTime()
-    // .withOffsetParsed();
     private static DateTimeFormatter dfHourKey = new DateTimeFormatterBuilder().appendYear(4, 4).appendMonthOfYear(2)
             .appendDayOfMonth(2).appendHourOfDay(2).toFormatter();
+
+    private static final TimeUnit TIMEUNIT_DEFAULT = TimeUnit.MICROSECONDS;
 
     // all reads/writes for cached data are ONE, meta reads/writes are at quorum
     private static final ConsistencyLevelPolicy CONSISTENCY_LEVEL_POLICY = new ConsistencyLevelPolicy() {
@@ -87,10 +87,8 @@ public class CassandraSinkRepository {
     };
 
     private static final Object EMPTY_BYTE_ARRAY = new byte[0];
-    private static final String HEADER_TIMESTAMP = "timestamp";
-    private static final String HEADER_SOURCE = "src";
-    private static final String HEADER_HOST = "host";
 
+    private TimeUnit timeUnit = TIMEUNIT_DEFAULT;
     private String hosts;
     private int port;
     private String clusterName;
@@ -129,24 +127,17 @@ public class CassandraSinkRepository {
     public void saveToCassandra(List<Event> eventList) {
         Mutator<ByteBuffer> m = HFactory.createMutator(keyspace, ByteBufferSerializer.get());
         for (Event event : eventList) {
-            Map<String, String> headers = event.getHeaders();
+            FlumeLogEvent flumeLog = new FlumeLogEvent(event, timeUnit);
 
-            DateTime ts;
-            if (headers.containsKey(HEADER_TIMESTAMP)) {
-                ts = getTime(headers.get("timestamp"));
-            }
-            else {
-                ts = new DateTime();
-                logger.info("Event is missing '" + HEADER_TIMESTAMP + "' header - using current time");
-            }
-            String src = headers.containsKey(HEADER_SOURCE) ? headers.get(HEADER_SOURCE) : "not-set";
-            String host = headers.containsKey(HEADER_HOST) ? headers.get(HEADER_HOST) : "not-set";
+            long ts = flumeLog.getTimestamp();
+            String src = flumeLog.getSource();
+            String host = flumeLog.getHost();
 
-            UUID tsUuid = createTimeUUID(ts);
-            String hour = getHourFromTime(ts);
+            UUID tsUuid = createTimeUUIDFromTimestamp(ts);
+            String hour = getHourFromTimestamp(ts);
 
             ByteBuffer recordsKey = TimeUUIDUtils.asByteBuffer(tsUuid);
-            m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("ts", ts.getMillis()));
+            m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("ts", ts));
             m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("src", src));
             m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("host", host));
             m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("data", event.getBody()));
@@ -157,23 +148,12 @@ public class CassandraSinkRepository {
         m.execute();
     }
 
-    private String getHourFromTime(DateTime ts) {
-        return dfHourKey.print(ts.withZone(DateTimeZone.UTC));
+    private String getHourFromTimestamp(long ts) {
+        return dfHourKey.print(new DateTime(timeUnit.toMillis(ts)).withZone(DateTimeZone.UTC));
     }
 
-    private DateTime getTime(String tsAsStr) {
-        if (null != tsAsStr && !tsAsStr.isEmpty()) {
-            // return dfEvent.parseDateTime(tsAsStr);
-            return new DateTime(Long.parseLong(tsAsStr));
-        }
-        else {
-            return new DateTime();
-        }
-
-    }
-
-    private UUID createTimeUUID(DateTime ts) {
-        return TimeUUIDUtils.getTimeUUID(ts.getMillis());
+    private UUID createTimeUUIDFromTimestamp(long ts) {
+        return TimeUUIDUtils.getTimeUUID(ts);
     }
 
     public List<LogEvent> getEventsForHour(String hour) {
@@ -234,7 +214,7 @@ public class CassandraSinkRepository {
                 String host = new String(slice.getColumnByName("host").getValue());
                 byte[] data = slice.getColumnByName("data").getValue();
 
-                LogEvent logEvt = new LogEvent(TimeUUIDUtils.getTimeFromUUID(row.getKey()), data);
+                LogEvent logEvt = new LogEvent(TimeUUIDUtils.getTimeFromUUID(row.getKey()), src, host, data);
                 logEventList.add(logEvt);
             }
         }
@@ -312,6 +292,10 @@ public class CassandraSinkRepository {
 
     public void setRecordsColFamName(String recordsColFameName) {
         this.recordsColFamName = recordsColFameName;
+    }
+
+    public void setTimeUnit(TimeUnit timeUnit) {
+        this.timeUnit = timeUnit;
     }
 
 }
