@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flume.sink.cassandra;
+package com.btoddb.flume.sinks.cassandra;
 
 import org.joda.time.DateTime;
 

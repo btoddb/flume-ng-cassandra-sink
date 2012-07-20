@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flume.sink.cassandra;
+package com.btoddb.flume.sinks.cassandra;
 
 import java.lang.management.ManagementFactory;
 import java.util.LinkedList;

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flume.sink.cassandra;
+package com.btoddb.flume.sinks.cassandra;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -49,6 +49,11 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import com.btoddb.flume.sinks.cassandra.CassandraSink;
+import com.btoddb.flume.sinks.cassandra.CassandraSinkRepository;
+import com.btoddb.flume.sinks.cassandra.FlumeLogEvent;
+import com.btoddb.flume.sinks.cassandra.LogEvent;
 
 public class TestCassandraSink {
     private static final String CASSANDRA_HOST = "localhost";

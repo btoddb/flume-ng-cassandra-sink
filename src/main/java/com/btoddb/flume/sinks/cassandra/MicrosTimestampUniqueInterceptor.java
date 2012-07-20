@@ -1,4 +1,4 @@
-package org.apache.flume.sink.cassandra;
+package com.btoddb.flume.sinks.cassandra;
 
 import java.util.List;
 import java.util.Map;
@@ -9,7 +9,7 @@ import org.apache.flume.interceptor.Interceptor;
 import org.apache.flume.interceptor.TimestampInterceptor;
 
 public class MicrosTimestampUniqueInterceptor implements Interceptor {
-    public static String CONFIG_HEADER_NAME = "timestamp";
+    public static String CONFIG_HEADER_NAME = "headerName";
     public static String CONFIG_PRESERVE = "preserveExisting";
 
     public static String HEADER_NAME_DFLT = "timestamp";
