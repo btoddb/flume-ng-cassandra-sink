@@ -1,4 +1,4 @@
-package com.btoddb.flume.sinks.cassandra;
+package com.btoddb.flume.interceptors;
 
 import java.util.List;
 import java.util.Map;

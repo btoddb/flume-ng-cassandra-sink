@@ -1,4 +1,4 @@
-package com.btoddb.flume.sinks.cassandra;
+package com.btoddb.flume.interceptors;
 
 /**
  * Synchronized Milliseconds Resolution used to create timestamp.

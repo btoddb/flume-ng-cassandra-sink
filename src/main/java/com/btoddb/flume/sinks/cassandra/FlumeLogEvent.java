@@ -8,6 +8,8 @@ import org.apache.flume.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.btoddb.flume.interceptors.MicrosecondsSyncClockResolution;
+
 public class FlumeLogEvent {
     private static final Logger logger = LoggerFactory.getLogger(FlumeLogEvent.class);
 

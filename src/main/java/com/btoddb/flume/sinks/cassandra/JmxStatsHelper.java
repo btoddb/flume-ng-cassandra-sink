@@ -25,7 +25,7 @@ public class JmxStatsHelper {
     public void resetStatsWindow() {
         reportingMap = calcMap;
         long endTime = System.currentTimeMillis();
-        for ( Stat st : reportingMap.values() ) {
+        for (Stat st : reportingMap.values()) {
             st.lock(endTime);
         }
         calcMap = new HashMap<String, JmxStatsHelper.Stat>();
@@ -60,12 +60,12 @@ public class JmxStatsHelper {
      * Contains the current stat of the named statistic.
      * 
      */
-    class Stat {
+    public class Stat {
         private final String name;
 
         private int count = 0;
         private long amount = 0;
-        
+
         private long startTime;
         private long endTime;
 
@@ -86,6 +86,7 @@ public class JmxStatsHelper {
         public void lock(long endTime) {
             this.endTime = endTime;
         }
+
         public int getCount() {
             return count;
         }
@@ -99,13 +100,19 @@ public class JmxStatsHelper {
         }
 
         public int getCountPerSecond() {
-            return (int) (count / ((getEndTime() - startTime) / 1000));
+            long tmp = getEndTime() - startTime;
+            if (0 < tmp) {
+                return (int) (count / (tmp / 1000.0));
+            }
+            else {
+                return 0;
+            }
         }
-        
+
         public long getStartTime() {
             return startTime;
         }
-        
+
         private long getEndTime() {
             return 0 < endTime ? endTime : System.currentTimeMillis();
         }
