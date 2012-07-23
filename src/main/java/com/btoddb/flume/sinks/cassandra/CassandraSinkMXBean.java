@@ -1,12 +1,9 @@
 package com.btoddb.flume.sinks.cassandra;
 
-public interface CassandraSinkMBean {
+public interface CassandraSinkMXBean {
 
 	int getMaxSaveBatchSize();
 	void setMaxSaveBatchSize(int maxBatchSize);
-	
-//	int getLastSaveBatchSize();
-//	long getLastSaveDurationInMicros();
 	
 	int getSaveAvgInMicros();
 	int getSavesPerSecond();

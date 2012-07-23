@@ -39,7 +39,7 @@ import org.apache.flume.sink.AbstractSink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CassandraSink extends AbstractSink implements Configurable, CassandraSinkMBean {
+public class CassandraSink extends AbstractSink implements Configurable, CassandraSinkMXBean {
     private static final Logger logger = LoggerFactory.getLogger(CassandraSink.class);
 
     private static final String MBEAN_NAME_ROOT = "org.apache.flume.sink:type=";
