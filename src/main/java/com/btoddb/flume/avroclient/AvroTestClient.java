@@ -3,6 +3,7 @@ package com.btoddb.flume.avroclient;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -105,11 +106,12 @@ public class AvroTestClient implements AvroClientTestMXBean {
         try {
             for (int i = 0; i < iterations; i++) {
                 if (0 == i % 100) {
-                    System.out.println("iteration : " + i + ", " + stats.getStat(STAT_REQUESTS).getCountPerSecond()
+                    System.out.println("iteration : " + new Date().toString() + " : " + i + " : " + stats.getStat(STAT_REQUESTS).getCountPerSecond()
                             + " reqs/sec");
                 }
                 Event event = EventBuilder.withBody(("test event : " + i + " : " + data).getBytes(), headerMap);
                 long start = System.nanoTime();
+//                check-batch-size
                 rpcClient.append(event);
                 stats.update(STAT_REQUESTS, 1, (System.nanoTime() - start) / 1000);
                 try {
