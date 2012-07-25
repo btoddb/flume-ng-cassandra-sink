@@ -16,7 +16,7 @@ public class FlumeLogEvent {
     private static final String DEFAULT_SOURCE = "not-set";
     private static final String DEFAULT_HOST = "not-set";
 
-    public static final String HEADER_TIMESTAMP = "time";
+    public static final String HEADER_TIMESTAMP = "timestamp";
     public static final String HEADER_SOURCE = "src";
     public static final String HEADER_HOST = "host";
 
