@@ -52,18 +52,10 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
 
     private CassandraSinkRepository repository;
     private MBeanServer mbs;
-    // private int lastSaveBatchSize;
-    // private long lastSaveDurationInMicros;
 
     private SinkCounter sinkCounter;
     private JmxStatsHelper stats;
 
-    // private long windowStartTime;
-    // private long windowDuration = 60 * 1000;
-    // private long runningSaveDurationInMicros;
-    // private int runningSaveCount;
-    //
-    // private long runningChannelTakeInMicros;
 
     @Override
     public void configure(Context context) {
@@ -94,7 +86,7 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
         }
 
         if (null == stats) {
-            stats = new JmxStatsHelper(60 * 1000);
+            stats = new JmxStatsHelper(5 * 1000);
         }
 
         mbs = ManagementFactory.getPlatformMBeanServer();
