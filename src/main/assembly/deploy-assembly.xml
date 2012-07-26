@@ -17,7 +17,7 @@
  under the License.
 -->
 <assembly>
-  <id>test-client</id>
+  <id>dist</id>
   <formats>
     <format>tar.gz</format>
   </formats>
