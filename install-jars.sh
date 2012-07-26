@@ -1,11 +1,11 @@
-FLUME_LIB_DIR=/btoddb/apache-flume-1.3.0-SNAPSHOT/lib
+FLUME_LIB_DIR=/btoddb/flume-dist/server-node/lib
 
 rm ${FLUME_LIB_DIR}/libthrift*
 
 rm -r tmp-staging > /dev/null
 mkdir tmp-staging
 pushd tmp-staging > /dev/null
-tar xvfz ../target/flume-cassandra-sink-1.0.0-SNAPSHOT-test-client.tar.gz > /dev/null
+tar xvfz ../target/flume-cassandra-sink-1.0.0-SNAPSHOT-dist.tar.gz > /dev/null
 pushd lib > /dev/null
 
 cp -v flume-cassandra-sink* \
