@@ -43,12 +43,12 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
     private static final Logger logger = LoggerFactory.getLogger(CassandraSink.class);
 
     private static final String MBEAN_NAME_ROOT = "org.apache.flume.sink:type=";
-    private static final int MAX_BATCH_SIZE = 100;
+    private static final int DEFAULT_BATCH_SIZE = 100;
     private static final String STAT_SAVE = "cass-save";
     private static final String STAT_TAKE = "channel-take";
     private static final String STAT_BATCH_SIZE = "batch-size";
 
-    private int maxSaveBatchSize = MAX_BATCH_SIZE;
+    private int maxSaveBatchSize;
 
     private CassandraSinkRepository repository;
     private MBeanServer mbs;
@@ -56,9 +56,9 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
     private SinkCounter sinkCounter;
     private JmxStatsHelper stats;
 
-
     @Override
     public void configure(Context context) {
+        maxSaveBatchSize = context.getInteger("transactionCapacity", DEFAULT_BATCH_SIZE);
         String hosts = context.getString("hosts");
         int port = context.getInteger("port", 9160);
         String clusterName = context.getString("cluster-name");
@@ -133,7 +133,7 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
                 }
                 finally {
                     long duration = (System.nanoTime() - channelStartTime) / 1000;
-                    logger.debug( "take duration (micros) = {}", duration);
+                    logger.debug("take duration (micros) = {}", duration);
                     stats.update(STAT_TAKE, 1, duration);
                 }
                 sinkCounter.incrementEventDrainAttemptCount();
@@ -159,6 +159,7 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
                     sinkCounter.incrementBatchUnderflowCount();
                 }
 
+                // save to cassandra
                 long start = System.nanoTime();
                 try {
                     repository.saveToCassandra(eventList);
