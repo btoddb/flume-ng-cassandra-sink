@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
 public class CassandraSink extends AbstractSink implements Configurable, CassandraSinkMXBean {
     private static final Logger logger = LoggerFactory.getLogger(CassandraSink.class);
 
-    private static final String MBEAN_NAME_ROOT = "org.apache.flume.sink:type=";
+    private static final String MBEAN_NAME_ROOT = "com.btoddb.flume.sinks.cassandra.CassandraSink:type=";
     private static final int DEFAULT_BATCH_SIZE = 100;
     private static final String STAT_SAVE = "cass-save";
     private static final String STAT_TAKE = "channel-take";
@@ -91,7 +91,7 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
 
         mbs = ManagementFactory.getPlatformMBeanServer();
         try {
-            mbs.registerMBean(this, new ObjectName(MBEAN_NAME_ROOT + getName() + "-perf"));
+            mbs.registerMBean(this, new ObjectName(MBEAN_NAME_ROOT + getName()));
         }
         catch (Throwable e) {
             logger.error("exception while registering me as mbean, " + MBEAN_NAME_ROOT + getName(), e);
@@ -101,7 +101,7 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
     @Override
     public void start() {
         repository.initHector();
-        stats.resetStatsWindow();
+        stats.resetRollingStatsWindow();
         sinkCounter.start();
         super.start();
     }
@@ -134,7 +134,7 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
                 finally {
                     long duration = (System.nanoTime() - channelStartTime) / 1000;
                     logger.debug("take duration (micros) = {}", duration);
-                    stats.update(STAT_TAKE, 1, duration);
+                    stats.updateRollingStat(STAT_TAKE, 1, duration);
                 }
                 sinkCounter.incrementEventDrainAttemptCount();
 
@@ -151,7 +151,7 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
             }
 
             if (!eventList.isEmpty()) {
-                stats.update(STAT_BATCH_SIZE, 1, eventList.size());
+                stats.updateRollingStat(STAT_BATCH_SIZE, 1, eventList.size());
                 if (eventList.size() == maxSaveBatchSize) {
                     sinkCounter.incrementBatchCompleteCount();
                 }
@@ -165,7 +165,7 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
                     repository.saveToCassandra(eventList);
                 }
                 finally {
-                    stats.update(STAT_SAVE, eventList.size(), (System.nanoTime() - start) / 1000);
+                    stats.updateRollingStat(STAT_SAVE, eventList.size(), (System.nanoTime() - start) / 1000);
                 }
 
                 sinkCounter.addToEventDrainSuccessCount(eventList.size());
@@ -229,27 +229,27 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
 
     @Override
     public int getSaveAvgInMicros() {
-        return stats.getStat(STAT_SAVE).getAverageAmount();
+        return stats.getRollingStat(STAT_SAVE).getAverageAmount();
     }
 
     @Override
     public int getSavesPerSecond() {
-        return stats.getStat(STAT_SAVE).getCountPerSecond();
+        return stats.getRollingStat(STAT_SAVE).getCountPerSecond();
     }
 
     @Override
     public int getTakeAvgInMicros() {
-        return stats.getStat(STAT_TAKE).getAverageAmount();
+        return stats.getRollingStat(STAT_TAKE).getAverageAmount();
     }
 
     @Override
     public int getTakesPerSecond() {
-        return stats.getStat(STAT_TAKE).getCountPerSecond();
+        return stats.getRollingStat(STAT_TAKE).getCountPerSecond();
     }
 
     @Override
     public int getBatchSizeAvg() {
-        return stats.getStat(STAT_BATCH_SIZE).getAverageAmount();
+        return stats.getRollingStat(STAT_BATCH_SIZE).getAverageAmount();
     }
 
 }

@@ -34,12 +34,13 @@ public class AvroTestClient implements AvroClientTestMXBean {
 
     private static final String STAT_REQUESTS = "reqs";
 
-    private int numThreads;
     private String host;
     private int port;
     private int batchSize;
     private int iterations;
     private int delay;
+    private int numThreads;
+    private String sourceType;
 
     private MBeanServer mbs;
     private JmxStatsHelper stats;
@@ -56,7 +57,7 @@ public class AvroTestClient implements AvroClientTestMXBean {
     }
 
     private void init(String[] args) {
-        if (6 != args.length) {
+        if (7 != args.length) {
             showUsage();
             System.exit(-1);
         }
@@ -67,6 +68,7 @@ public class AvroTestClient implements AvroClientTestMXBean {
         iterations = Integer.parseInt(args[3]);
         delay = Integer.parseInt(args[4]);
         numThreads = Integer.parseInt(args[5]);
+        sourceType = args[6];
 
         if (null == stats) {
             stats = new JmxStatsHelper(5 * 1000);
@@ -92,7 +94,7 @@ public class AvroTestClient implements AvroClientTestMXBean {
     private void showUsage() {
         System.out.println();
         System.out
-                .println("usage: AvroTestclient <host> <port> <batch-size> <iterations> <delay-in-millis> <num-threads>");
+                .println("usage: AvroTestclient <host> <port> <batch-size> <iterations> <delay-in-millis> <num-threads> <src>");
         System.out.println();
     }
 
@@ -111,11 +113,12 @@ public class AvroTestClient implements AvroClientTestMXBean {
         String data = sb.toString();
 
         clientIp = InetAddress.getLocalHost().getHostAddress();
-        
+
         String dataFormatter = new String("%s : %09d : %s");
-        
+
         System.out.println();
-        System.out.println("sample data " + String.format( dataFormatter, clientIp, Integer.valueOf(234), data) );
+        System.out
+                .println("sample data \"" + String.format(dataFormatter, clientIp, Integer.valueOf(234), data) + "\"");
         System.out.println();
 
         //
@@ -125,7 +128,7 @@ public class AvroTestClient implements AvroClientTestMXBean {
         for (int i = 0; i < iterations; i++) {
             showStats();
             try {
-                workQueue.put(String.format( dataFormatter, clientIp, Integer.valueOf(i), data));
+                workQueue.put(String.format(dataFormatter, clientIp, Integer.valueOf(i), data));
             }
             catch (InterruptedException e) {
                 Thread.interrupted();
@@ -151,7 +154,7 @@ public class AvroTestClient implements AvroClientTestMXBean {
     private void showStats() {
         if (2000 < System.currentTimeMillis() - start) {
             System.out.println("iteration : " + new Date().toString() + " : " + numProcessed.get() + " : "
-                    + stats.getStat(STAT_REQUESTS).getCountPerSecond() + " reqs/sec");
+                    + stats.getRollingStat(STAT_REQUESTS).getCountPerSecond() + " reqs/sec");
             start = System.currentTimeMillis();
         }
 
@@ -164,12 +167,12 @@ public class AvroTestClient implements AvroClientTestMXBean {
 
     @Override
     public int getRequestsPerSecond() {
-        return stats.getStat(STAT_REQUESTS).getCountPerSecond();
+        return stats.getRollingStat(STAT_REQUESTS).getCountPerSecond();
     }
 
     @Override
     public int getRequestAvgInMicros() {
-        return stats.getStat(STAT_REQUESTS).getAverageAmount();
+        return stats.getRollingStat(STAT_REQUESTS).getAverageAmount();
     }
 
     @Override
@@ -229,7 +232,7 @@ public class AvroTestClient implements AvroClientTestMXBean {
             Thread.currentThread().setName("Test Worker " + workerId);
             RpcClient rpcClient = createRpcClient();
             Map<String, String> headerMap = new HashMap<String, String>();
-            headerMap.put(FlumeLogEvent.HEADER_SOURCE, "source" + workerId);
+            headerMap.put(FlumeLogEvent.HEADER_SOURCE, sourceType + ":" + String.format("%02d", workerId));
 
             try {
                 while (!stopProcessing) {
@@ -253,7 +256,7 @@ public class AvroTestClient implements AvroClientTestMXBean {
                         long start = System.nanoTime();
                         // check-batch-size
                         rpcClient.append(event);
-                        stats.update(STAT_REQUESTS, 1, (System.nanoTime() - start) / 1000);
+                        stats.updateRollingStat(STAT_REQUESTS, 1, (System.nanoTime() - start) / 1000);
                         try {
                             Thread.sleep(delay);
                         }

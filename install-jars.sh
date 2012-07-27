@@ -27,7 +27,11 @@ cp -v flume-cassandra-sink* \
       metrics-core* \
       libthrift* \
       cassandra-thrift* \
+      je-5.0.58.jar \
    ${FLUME_LIB_DIR}/.
+
+cp -v flume-cassandra-sink* /btoddb/flume-dist/client-node/lib/.
+cp -v flume-cassandra-sink* /btoddb/flume-dist/avro-test-client/lib/.
 
 popd > /dev/null
 popd > /dev/null

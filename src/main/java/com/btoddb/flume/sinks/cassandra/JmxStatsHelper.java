@@ -2,24 +2,26 @@ package com.btoddb.flume.sinks.cassandra;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class JmxStatsHelper {
 
     private Map<String, Stat> reportingMap = new HashMap<String, Stat>();
     private Map<String, Stat> calcMap = new HashMap<String, Stat>();
-
+    private Map<String, AtomicLong> counterMap = new HashMap<String, AtomicLong>();
+    
     private long windowStartTime;
     private long windowDuration = 15 * 1000;
 
     private volatile boolean checkingWindow = false;
     private Object checkingWindowMonitor = new Object();
-    private Object updateMonitor = new Object();
+    private Object updateRollingMonitor = new Object();
     private Object createStatMonitor = new Object();
 
     public JmxStatsHelper(long windowDuration) {
         this.windowDuration = windowDuration;
-        resetStatsWindow();
+        resetRollingStatsWindow();
     }
 
     public void checkStatsWindow() {
@@ -38,7 +40,7 @@ public class JmxStatsHelper {
         if (gotAccess) {
             try {
                 if (System.currentTimeMillis() - windowStartTime > windowDuration) {
-                    resetStatsWindow();
+                    resetRollingStatsWindow();
                 }
             }
             finally {
@@ -47,8 +49,8 @@ public class JmxStatsHelper {
         }
     }
 
-    public void resetStatsWindow() {
-        synchronized (updateMonitor) {
+    public void resetRollingStatsWindow() {
+        synchronized (updateRollingMonitor) {
             reportingMap = calcMap;
             calcMap = new HashMap<String, JmxStatsHelper.Stat>();
             windowStartTime = System.currentTimeMillis();
@@ -61,7 +63,7 @@ public class JmxStatsHelper {
         }
     }
 
-    public void update(String name, int count, long amount) {
+    public void updateRollingStat(String name, int count, long amount) {
         checkStatsWindow();
         Stat stat = getCalcStat(name);
         stat.increment(count, amount);
@@ -70,20 +72,20 @@ public class JmxStatsHelper {
     private Stat getCalcStat(String name) {
         Stat stat = calcMap.get(name);
         if (null == stat) {
-            stat = createNewStat(calcMap, name, windowStartTime);
+            stat = createNewRollingStat(calcMap, name, windowStartTime);
         }
         return stat;
     }
 
-    public Stat getStat(String name) {
+    public Stat getRollingStat(String name) {
         Stat stat = reportingMap.get(name);
         if (null == stat) {
-            stat = createNewStat(reportingMap, name, windowStartTime);
+            stat = createNewRollingStat(reportingMap, name, windowStartTime);
         }
         return stat;
     }
 
-    private Stat createNewStat(Map<String, Stat> map, String name, long windowStartTime) {
+    private Stat createNewRollingStat(Map<String, Stat> map, String name, long windowStartTime) {
         Stat stat = map.get(name);
         if ( null != stat ) {
             return stat;
@@ -93,6 +95,22 @@ public class JmxStatsHelper {
             stat = map.get(name);
             if (null == stat) {
                 stat = new Stat(name, windowStartTime);
+                map.put(name, stat);
+            }
+            return stat;
+        }
+    }
+
+    private AtomicLong createNewCounterStat(Map<String, AtomicLong> map, String name) {
+        AtomicLong stat = map.get(name);
+        if ( null != stat ) {
+            return stat;
+        }
+        
+        synchronized (createStatMonitor) {
+            stat = map.get(name);
+            if (null == stat) {
+                stat = new AtomicLong();
                 map.put(name, stat);
             }
             return stat;
@@ -179,5 +197,21 @@ public class JmxStatsHelper {
         private long getEndTime() {
             return 0 < endTime ? endTime : System.currentTimeMillis();
         }
+    }
+
+    public void incrementCounter(String name, long count) {
+        getCounterStatInternal(name).addAndGet(count);
+    }
+    
+    private AtomicLong getCounterStatInternal(String name) {
+        AtomicLong stat = counterMap.get(name);
+        if (null == stat) {
+            stat = createNewCounterStat(counterMap, name);
+        }
+        return stat;
+    }
+    
+    public long getCounterStat(String name) {
+        return getCounterStatInternal(name).get();
     }
 }
