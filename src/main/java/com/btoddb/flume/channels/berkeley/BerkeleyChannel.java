@@ -24,7 +24,7 @@ import com.sleepycat.je.EnvironmentConfig;
 public class BerkeleyChannel extends BasicChannelSemantics implements BerkeleyChannelMXBean {
     private static final Logger logger = LoggerFactory.getLogger(BerkeleyChannel.class);
 
-    private static final String MBEAN_NAME_ROOT = "com.btoddb.flume.channels.BerkeleyChannel:type=";
+    private static final String MBEAN_NAME_ROOT = "com.btoddb.flume.channels.berkeley.BerkeleyChannel:type=";
     
     public static final String STAT_PUT = "put";
     public static final String STAT_TAKE = "take";
@@ -41,7 +41,7 @@ public class BerkeleyChannel extends BasicChannelSemantics implements BerkeleyCh
     private JmxStatsHelper stats;
 
     private Environment dbEnv = null;
-    private File dbPath = new File("./flume-berkley-db");
+    private File dbPath = new File("./flume-berkeley-db");
     private Database db = null;
     private String timestampHeader;
     private long maxChannelSize;
