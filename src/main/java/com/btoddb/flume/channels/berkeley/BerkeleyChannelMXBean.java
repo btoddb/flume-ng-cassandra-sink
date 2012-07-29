@@ -1,4 +1,4 @@
-package com.btoddb.flume.channels;
+package com.btoddb.flume.channels.berkeley;
 
 public interface BerkeleyChannelMXBean {
 

@@ -124,17 +124,17 @@
 			<version>1.6.1</version>
 		</dependency>
 
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-core</artifactId>
+            <version>1.0.1</version>
+        </dependency>
+
 		<!-- berkeley channel dependencies -->
 		<dependency>
 			<groupId>com.sleepycat</groupId>
 			<artifactId>je</artifactId>
 			<version>5.0.58</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.hadoop</groupId>
-			<artifactId>hadoop-core</artifactId>
-			<version>1.0.1</version>
 		</dependency>
 
 		<!-- test dependencies -->

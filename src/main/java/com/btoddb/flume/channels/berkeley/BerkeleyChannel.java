@@ -1,4 +1,4 @@
-package com.btoddb.flume.channels;
+package com.btoddb.flume.channels.berkeley;
 
 import java.io.File;
 import java.lang.management.ManagementFactory;
@@ -17,6 +17,7 @@ import com.btoddb.flume.sinks.cassandra.JmxStatsHelper;
 import com.sleepycat.je.Database;
 import com.sleepycat.je.DatabaseConfig;
 import com.sleepycat.je.DatabaseException;
+import com.sleepycat.je.Durability;
 import com.sleepycat.je.Environment;
 import com.sleepycat.je.EnvironmentConfig;
 
@@ -88,8 +89,7 @@ public class BerkeleyChannel extends BasicChannelSemantics implements BerkeleyCh
             EnvironmentConfig envConfig = new EnvironmentConfig();
             envConfig.setAllowCreate(true);
             envConfig.setTransactional(true);
-            envConfig.setTxnWriteNoSyncVoid(true);
-            // envConfig.setDurability(Durability.COMMIT_WRITE_NO_SYNC);
+            envConfig.setDurability(Durability.COMMIT_WRITE_NO_SYNC);
 
             dbEnv = new Environment(dbPath, envConfig);
 

@@ -33,7 +33,7 @@ import com.google.common.collect.Maps;
 /**
  * Persistable wrapper for Event
  */
-class FlumeEvent implements Event, Writable {
+public class FlumeEvent implements Event, Writable {
 
   private Map<String, String> headers;
   private byte[] body;
@@ -41,7 +41,7 @@ class FlumeEvent implements Event, Writable {
   private FlumeEvent() {
     this(null, null);
   }
-  FlumeEvent(Map<String, String> headers, byte[] body) {
+  public FlumeEvent(Map<String, String> headers, byte[] body) {
     this.headers = headers;
     this.body = body;
   }
@@ -112,7 +112,7 @@ class FlumeEvent implements Event, Writable {
     }
     return result;
   }
-  static FlumeEvent from(DataInput in) throws IOException {
+  public static FlumeEvent from(DataInput in) throws IOException {
     FlumeEvent event = new FlumeEvent();
     event.readFields(in);
     return event;

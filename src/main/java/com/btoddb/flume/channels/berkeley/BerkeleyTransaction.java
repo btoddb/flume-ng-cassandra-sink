@@ -1,4 +1,4 @@
-package com.btoddb.flume.channels;
+package com.btoddb.flume.channels.berkeley;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -14,6 +14,7 @@ import org.apache.flume.channel.BasicTransactionSemantics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.btoddb.flume.channels.FlumeEvent;
 import com.btoddb.flume.sinks.cassandra.JmxStatsHelper;
 import com.sleepycat.je.Cursor;
 import com.sleepycat.je.Database;
