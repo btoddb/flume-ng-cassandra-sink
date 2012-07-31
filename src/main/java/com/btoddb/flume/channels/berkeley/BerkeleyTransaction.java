@@ -105,25 +105,6 @@ public class BerkeleyTransaction extends BasicTransactionSemantics {
     }
 
     @Override
-    protected void doCommit() throws InterruptedException {
-        cleanupCursor();
-        txn.commit();
-        if (0 != count) {
-            stats.incrementCounter(BerkeleyChannel.STAT_COMMITS, 1);
-        }
-    }
-
-    @Override
-    protected void doRollback() throws InterruptedException {
-        cleanupCursor();
-        txn.abort();
-        stats.incrementCounter(BerkeleyChannel.STAT_ROLLBACKS, 1);
-        if (0 != count) {
-            stats.incrementCounter(BerkeleyChannel.STAT_CHANNEL_SIZE, -count);
-        }
-    }
-
-    @Override
     protected Event doTake() throws InterruptedException {
         if (putMode) {
             throw new ChannelException(
@@ -166,6 +147,25 @@ public class BerkeleyTransaction extends BasicTransactionSemantics {
             long duration = (System.nanoTime() - statStartTime) / 1000;
             logger.debug("take duration (micros) = {}", duration);
             stats.updateRollingStat(BerkeleyChannel.STAT_TAKE, 1, duration);
+        }
+    }
+
+    @Override
+    protected void doCommit() throws InterruptedException {
+        cleanupCursor();
+        txn.commit();
+        if (0 != count) {
+            stats.incrementCounter(BerkeleyChannel.STAT_COMMITS, 1);
+        }
+    }
+
+    @Override
+    protected void doRollback() throws InterruptedException {
+        cleanupCursor();
+        txn.abort();
+        stats.incrementCounter(BerkeleyChannel.STAT_ROLLBACKS, 1);
+        if (0 != count) {
+            stats.incrementCounter(BerkeleyChannel.STAT_CHANNEL_SIZE, -count);
         }
     }
 

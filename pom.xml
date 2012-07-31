@@ -137,6 +137,13 @@
 			<version>5.0.58</version>
 		</dependency>
 
+        <!-- hornetq channel dependencies -->
+        <dependency>
+            <groupId>org.hornetq</groupId>
+            <artifactId>hornetq-core</artifactId>
+            <version>2.2.18.Final</version>
+        </dependency>
+
 		<!-- test dependencies -->
 		<dependency>
 			<groupId>org.hectorclient</groupId>

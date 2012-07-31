@@ -28,6 +28,7 @@ cp -v flume-cassandra-sink* \
       libthrift* \
       cassandra-thrift* \
       je-5.0.58.jar \
+      hornetq-core-2.2.18.Final.jar \
    ${FLUME_LIB_DIR}/.
 
 cp -v flume-cassandra-sink* /btoddb/flume-dist/client-node/lib/.
