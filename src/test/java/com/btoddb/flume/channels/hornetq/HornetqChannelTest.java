@@ -64,6 +64,11 @@ public class HornetqChannelTest {
 
     @After
     public void cleanup() throws Exception {
-        Files.deleteRecursively(dataDir);
+        try {
+            Files.deleteRecursively(dataDir);
+        }
+        catch (Throwable e) {
+            // ignore
+        }
     }
 }

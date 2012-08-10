@@ -29,8 +29,11 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.cassandra.cli.CliMain;
@@ -42,18 +45,12 @@ import org.apache.flume.conf.Configurables;
 import org.apache.flume.event.EventBuilder;
 import org.apache.flume.lifecycle.LifecycleState;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormatterBuilder;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
-import com.btoddb.flume.sinks.cassandra.CassandraSink;
-import com.btoddb.flume.sinks.cassandra.CassandraSinkRepository;
-import com.btoddb.flume.sinks.cassandra.FlumeLogEvent;
-import com.btoddb.flume.sinks.cassandra.LogEvent;
 
 public class TestCassandraSink {
     private static final String CASSANDRA_HOST = "localhost";
@@ -104,13 +101,17 @@ public class TestCassandraSink {
 
     @Test
     public void testProcessing() throws Exception {
-        int numEvents = 20;
+        Set<String> hourSet = new HashSet<String>();
+        int numEvents = 120;
 
         // setup events
         List<Event> eventList = new ArrayList<Event>(numEvents);
         DateTime baseTime = new DateTime();
         for (int i = 0; i < numEvents; i++) {
-            String timeAsStr = String.valueOf(baseTime.plusMinutes(10 * i).getMillis()*1000);
+            long ts = baseTime.plusMinutes(i).getMillis() * 1000;
+            String hour = sink.getRepository().getHourFromTimestamp(ts);
+            hourSet.add(hour);
+            String timeAsStr = String.valueOf(ts);
 
             Map<String, String> headerMap = new HashMap<String, String>();
             headerMap.put(FlumeLogEvent.HEADER_TIMESTAMP, timeAsStr);
@@ -133,6 +134,12 @@ public class TestCassandraSink {
         transaction.close();
 
         sink.process();
+
+        int count = 0;
+        for (String ts : hourSet) {
+            count += countEvents(ts);
+        }
+        assertEquals(eventList.size(), count);
 
         // check cassandra for data
         checkCass(eventList);
@@ -165,6 +172,8 @@ public class TestCassandraSink {
 
         sink.process();
 
+        // assertEquals(eventList.size(), countEvents());
+
         // check cassandra for data
         checkCass(eventList);
 
@@ -175,29 +184,41 @@ public class TestCassandraSink {
     // ----------------------
 
     private void checkCass(List<Event> eventList) {
-        for (Event event : eventList) {
-            DateTime dt = new DateTime(TimeUnit.MICROSECONDS.toMillis(Long.parseLong(event.getHeaders().get(FlumeLogEvent.HEADER_TIMESTAMP))))
-                    .withZone(DateTimeZone.UTC);
-            String cassKey = dfHourKey.print(dt);
-            List<LogEvent> retrievedEvents = sink.getRepository().getEventsForHour(cassKey);
+        sink.getRepository().setMaxColumnBatchSize(1);
+        for (int i = 0; i < eventList.size(); i++) {
+            Event event = eventList.get(i);
+            long ts = Long.parseLong(event.getHeaders().get(FlumeLogEvent.HEADER_TIMESTAMP));
+            String cassKey = sink.getRepository().getHourFromTimestamp(ts);
+            Iterator<LogEvent> eventIter = sink.getRepository().getEventsForHour(cassKey);
 
             boolean found = false;
-            for (LogEvent logEvent : retrievedEvents) {
+            while (eventIter.hasNext()) {
+                LogEvent logEvent = eventIter.next();
                 if (Arrays.equals(event.getBody(), logEvent.getData())) {
                     found = true;
                     break;
                 }
             }
 
-            assertTrue(found);
+            assertTrue("could not find event at index " + i, found);
         }
+    }
+
+    private int countEvents(String hour) {
+        Iterator<LogEvent> eventIter = sink.getRepository().getEventsForHour(hour);
+        int count = 0;
+        while (eventIter.hasNext()) {
+            eventIter.next();
+            count++;
+        }
+        return count;
     }
 
     @Before
     public void setupTest() throws Exception {
         Context channelContext = new Context();
-        channelContext.put("capacity", "100");
-        channelContext.put("transactionCapacity", "100");
+        channelContext.put("capacity", "200");
+        channelContext.put("transactionCapacity", "200");
 
         channel = new MemoryChannel();
         channel.setName("junitChannel");
@@ -209,6 +230,8 @@ public class TestCassandraSink {
         sinkContext.put("cluster-name", "Logging");
         sinkContext.put("keyspace-name", "logs");
         sinkContext.put("max-conns-per-host", "1");
+        sinkContext.put("scatter-value", "5");
+        sinkContext.put("batch-size", "200");
 
         sink = new CassandraSink();
         Configurables.configure(sink, sinkContext);

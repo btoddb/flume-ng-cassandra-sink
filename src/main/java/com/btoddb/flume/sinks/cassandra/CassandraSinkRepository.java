@@ -19,19 +19,14 @@
 package com.btoddb.flume.sinks.cassandra;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import me.prettyprint.cassandra.connection.SpeedForJOpTimer;
 import me.prettyprint.cassandra.serializers.ByteBufferSerializer;
-import me.prettyprint.cassandra.serializers.BytesArraySerializer;
-import me.prettyprint.cassandra.serializers.StringSerializer;
-import me.prettyprint.cassandra.serializers.UUIDSerializer;
 import me.prettyprint.cassandra.service.CassandraHostConfigurator;
 import me.prettyprint.cassandra.service.OperationType;
 import me.prettyprint.cassandra.utils.TimeUUIDUtils;
@@ -39,15 +34,8 @@ import me.prettyprint.hector.api.Cluster;
 import me.prettyprint.hector.api.ConsistencyLevelPolicy;
 import me.prettyprint.hector.api.HConsistencyLevel;
 import me.prettyprint.hector.api.Keyspace;
-import me.prettyprint.hector.api.beans.ColumnSlice;
-import me.prettyprint.hector.api.beans.HColumn;
-import me.prettyprint.hector.api.beans.Row;
-import me.prettyprint.hector.api.beans.Rows;
 import me.prettyprint.hector.api.factory.HFactory;
 import me.prettyprint.hector.api.mutation.Mutator;
-import me.prettyprint.hector.api.query.MultigetSliceQuery;
-import me.prettyprint.hector.api.query.QueryResult;
-import me.prettyprint.hector.api.query.SliceQuery;
 
 import org.apache.flume.Event;
 import org.joda.time.DateTime;
@@ -59,11 +47,6 @@ import org.slf4j.LoggerFactory;
 
 public class CassandraSinkRepository {
     private static final Logger logger = LoggerFactory.getLogger(CassandraSinkRepository.class);
-
-    private static DateTimeFormatter dfHourKey = new DateTimeFormatterBuilder().appendYear(4, 4).appendMonthOfYear(2)
-            .appendDayOfMonth(2).appendHourOfDay(2).toFormatter();
-
-    private static final TimeUnit TIMEUNIT_DEFAULT = TimeUnit.MICROSECONDS;
 
     // all reads/writes for cached data are ONE, meta reads/writes are at quorum
     private static final ConsistencyLevelPolicy CONSISTENCY_LEVEL_POLICY = new ConsistencyLevelPolicy() {
@@ -86,6 +69,10 @@ public class CassandraSinkRepository {
         }
     };
 
+    private static DateTimeFormatter dfHourKey = new DateTimeFormatterBuilder().appendYear(4, 4).appendMonthOfYear(2)
+            .appendDayOfMonth(2).appendHourOfDay(2).toFormatter();
+
+    private static final TimeUnit TIMEUNIT_DEFAULT = TimeUnit.MICROSECONDS;
     private static final Object EMPTY_BYTE_ARRAY = new byte[0];
 
     private TimeUnit timeUnit = TIMEUNIT_DEFAULT;
@@ -96,6 +83,13 @@ public class CassandraSinkRepository {
     private int socketTimeoutMillis;
     private int maxConnectionsPerHost;
     private int maxExhaustedWaitMillis;
+    private int maxColumnBatchSize = 100;
+
+    // used to distribute load around the cluster
+    private byte scatterValue;
+    private byte nextScatter = 0;
+    private LogEventColumnTranslator columnTranslator;
+
     private String hoursColFamName = "hours";
     private String recordsColFamName = "records";
 
@@ -122,6 +116,8 @@ public class CassandraSinkRepository {
 
         cluster = HFactory.createCluster(clusterName, cassConfig, null);
         keyspace = HFactory.createKeyspace(keyspaceName, cluster, CONSISTENCY_LEVEL_POLICY);
+        
+        columnTranslator = new LogEventColumnTranslator(keyspace, recordsColFamName);
     }
 
     public void saveToCassandra(List<Event> eventList) {
@@ -134,7 +130,6 @@ public class CassandraSinkRepository {
             String host = flumeLog.getHost();
 
             UUID tsUuid = createTimeUUIDFromTimestamp(ts);
-            String hour = getHourFromTimestamp(ts);
 
             ByteBuffer recordsKey = TimeUUIDUtils.asByteBuffer(tsUuid);
             m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("ts", ts));
@@ -142,13 +137,28 @@ public class CassandraSinkRepository {
             m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("host", host));
             m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("data", event.getBody()));
 
-            m.addInsertion(ByteBuffer.wrap(hour.getBytes()), hoursColFamName,
-                    HFactory.createColumn(tsUuid, EMPTY_BYTE_ARRAY));
+            m.addInsertion(createTimeBasedKey(ts), hoursColFamName, HFactory.createColumn(tsUuid, EMPTY_BYTE_ARRAY));
         }
         m.execute();
     }
 
-    private String getHourFromTimestamp(long ts) {
+    // time based keys use a "scatter value" to scatter the writes across the cassandra cluster distributing the load
+    // instead of burning a hole in a single node, making better use of the cassandra cluster
+    private ByteBuffer createTimeBasedKey(String hour, byte scatterValue) {
+        ByteBuffer bb = ByteBuffer.allocate(hour.length() + 3);
+        bb.put(hour.getBytes()).put(String.format("%03d", scatterValue).getBytes());
+        bb.rewind();
+        return bb;
+    }
+
+    private ByteBuffer createTimeBasedKey(long timestamp) {
+        String hour = getHourFromTimestamp(timestamp);
+        ByteBuffer bb = createTimeBasedKey(hour, (byte)nextScatter);
+        nextScatter = (byte)((nextScatter + 1) % scatterValue);
+        return bb;
+    }
+
+    public String getHourFromTimestamp(long ts) {
         return dfHourKey.print(new DateTime(timeUnit.toMillis(ts)).withZone(DateTimeZone.UTC));
     }
 
@@ -156,71 +166,63 @@ public class CassandraSinkRepository {
         return TimeUUIDUtils.getTimeUUID(ts);
     }
 
-    public List<LogEvent> getEventsForHour(String hour) {
-        SliceQuery<String, UUID, byte[]> dayQuery = HFactory.createSliceQuery(keyspace, StringSerializer.get(),
-                UUIDSerializer.get(), BytesArraySerializer.get());
-        dayQuery.setColumnFamily(hoursColFamName);
-        dayQuery.setKey(hour);
-        dayQuery.setRange(null, null, false, 100);
-
-        // TODO:BTB - this will need to be paginated
-        QueryResult<ColumnSlice<UUID, byte[]>> dayResult = dayQuery.execute();
-
-        ColumnSlice<UUID, byte[]> daySlice = null != dayResult ? dayResult.get() : null;
-        List<HColumn<UUID, byte[]>> dayColList = null != daySlice ? daySlice.getColumns() : null;
-        if (null != dayColList && !dayColList.isEmpty()) {
-            List<UUID> recordKeyList = new ArrayList<UUID>();
-            for (HColumn<UUID, byte[]> col : dayColList) {
-                recordKeyList.add(col.getName());
-            }
-
-            // TODO:BTB - this will need to be done in pages
-            return getRecords(recordKeyList);
+    public Iterator<LogEvent> getEventsForHour(String hour) {
+        ByteBuffer[] keyArr = new ByteBuffer[scatterValue];
+        for (int i = 0; i < scatterValue; i++) {
+            keyArr[i] = createTimeBasedKey(hour, (byte) i);
         }
-        else {
-            return Collections.emptyList();
-        }
+        MultiRowMergeColumnIterator iter = new MultiRowMergeColumnIterator(keyspace, hoursColFamName, keyArr,
+                TimeUUIDComparator.INSTANCE, columnTranslator, maxColumnBatchSize);
+        return iter;
+        // MultigetSliceQuery<ByteBuffer, UUID, byte[]> dayQuery = HFactory.createMultigetSliceQuery(keyspace,
+        // ByteBufferSerializer.get(), UUIDSerializer.get(), BytesArraySerializer.get());
+        // dayQuery.setColumnFamily(hoursColFamName);
+        // ByteBuffer[] bbArr = new ByteBuffer[scatterValue];
+        // for (int i = 0; i < scatterValue; i++) {
+        // bbArr[i] = createTimeBasedKey(hour, (byte) i);
+        // }
+        // dayQuery.setKeys(bbArr);
+        // dayQuery.setRange(null, null, false, 100);
+        //
+        // // TODO:BTB - this will need to be paginated
+        // QueryResult<Rows<ByteBuffer, UUID, byte[]>> dayResult = dayQuery.execute();
+        // Rows<ByteBuffer, UUID, byte[]> rows = null != dayResult ? dayResult.get() : null;
+        // if (null == rows) {
+        // return Collections.emptyList();
+        // }
+        //
+        // List<UUID> recordKeyList = createSortedListFromScatteredRows(rows);
+        // return getRecords(recordKeyList);
     }
 
-    private List<LogEvent> getRecords(List<UUID> recordKeyList) {
-        MultigetSliceQuery<UUID, String, byte[]> q = HFactory.createMultigetSliceQuery(keyspace, UUIDSerializer.get(),
-                StringSerializer.get(), BytesArraySerializer.get());
-        q.setColumnFamily(recordsColFamName);
-        q.setKeys(recordKeyList);
-        q.setRange(null, null, false, 100);
-
-        // get the records
-        // TODO:BTB - this will need to be paginated
-        QueryResult<Rows<UUID, String, byte[]>> result = q.execute();
-
-        // make sure we got something and dig for the data
-        Rows<UUID, String, byte[]> rows = null != result ? result.get() : null;
-        Iterator<Row<UUID, String, byte[]>> iter = null != rows ? rows.iterator() : null;
-        if (null == iter) {
-            return Collections.emptyList();
-        }
-
-        // iterate over the rows returned
-        List<LogEvent> logEventList = new LinkedList<LogEvent>();
-        while (iter.hasNext()) {
-            Row<UUID, String, byte[]> row = iter.next();
-            ColumnSlice<String, byte[]> slice = null != row ? row.getColumnSlice() : null;
-            List<HColumn<String, byte[]>> colList = null != slice ? slice.getColumns() : null;
-
-            // it is possible to get a row with no columns (has tombstones)
-            if (null != colList && !colList.isEmpty()) {
-                HColumn<String, byte[]> tmp = slice.getColumnByName("src");
-                String src = new String(tmp.getValue());
-                String host = new String(slice.getColumnByName("host").getValue());
-                byte[] data = slice.getColumnByName("data").getValue();
-
-                LogEvent logEvt = new LogEvent(TimeUUIDUtils.getTimeFromUUID(row.getKey()), src, host, data);
-                logEventList.add(logEvt);
-            }
-        }
-
-        return logEventList;
-    }
+    // private List<UUID> createSortedListFromScatteredRows(Rows<ByteBuffer, UUID, byte[]> rows) {
+    // if (null == rows) {
+    // return Collections.emptyList();
+    // }
+    //
+    // MultiRowMergeColumnIterator iter = new MultiRowMergeColumnIterator(keyspace, hoursColFamName, keyList,
+    // TimeUUIDComparator.INSTANCE);
+    //
+    // boolean done = false;
+    // while (!done) {
+    // for (Row<ByteBuffer, UUID, byte[]> row : rows) {
+    // ColumnSlice<UUID, byte[]> daySlice = null != row ? row.getColumnSlice() : null;
+    // List<HColumn<UUID, byte[]>> dayColList = null != daySlice ? daySlice.getColumns() : null;
+    // if (null != dayColList && !dayColList.isEmpty()) {
+    // List<UUID> recordKeyList = new ArrayList<UUID>();
+    // for (HColumn<UUID, byte[]> col : dayColList) {
+    // recordKeyList.add(col.getName());
+    // }
+    //
+    // // TODO:BTB - this will need to be done in pages
+    // return getRecords(recordKeyList);
+    // }
+    // else {
+    // return Collections.emptyList();
+    // }
+    // }
+    // }
+    // }
 
     public String getHosts() {
         return hosts;
@@ -296,6 +298,46 @@ public class CassandraSinkRepository {
 
     public void setTimeUnit(TimeUnit timeUnit) {
         this.timeUnit = timeUnit;
+    }
+
+    public void setScatterValue(byte scatterValue) {
+        this.scatterValue = scatterValue;
+    }
+
+    public byte getScatterValue() {
+        return scatterValue;
+    }
+
+    // -----------
+
+    public static class TimeUUIDComparator implements Comparator<UUID> {
+        public static final TimeUUIDComparator INSTANCE = new TimeUUIDComparator();
+
+        @Override
+        public int compare(UUID o1, UUID o2) {
+            if (null == o1 && null == o2) {
+                return 0;
+            }
+            else if (null == o1) {
+                return -1;
+            }
+            else if (null == o2) {
+                return 1;
+            }
+            else {
+                long t1 = TimeUUIDUtils.getTimeFromUUID(o1);
+                long t2 = TimeUUIDUtils.getTimeFromUUID(o2);
+                return t1 < t2 ? -1 : (t1 > t2 ? 1 : o1.compareTo(o2));
+            }
+        }
+    }
+
+    public int getMaxColumnBatchSize() {
+        return maxColumnBatchSize;
+    }
+
+    public void setMaxColumnBatchSize(int maxColumnBatchSize) {
+        this.maxColumnBatchSize = maxColumnBatchSize;
     }
 
 }

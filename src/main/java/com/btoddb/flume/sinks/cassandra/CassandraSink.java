@@ -43,7 +43,10 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
     private static final Logger logger = LoggerFactory.getLogger(CassandraSink.class);
 
     private static final String MBEAN_NAME_ROOT = "com.btoddb.flume.sinks.cassandra.CassandraSink:type=";
-    private static final int DEFAULT_BATCH_SIZE = 100;
+    private static final int DEFAULT_SAVE_BATCH_SIZE = 100;
+//    private static final int DEFAULT_READ_BATCH_SIZE = 100;
+    private static final byte DEFAULT_SCATTER_VALUE = 10;
+
     private static final String STAT_SAVE = "cass-save";
     private static final String STAT_TAKE = "channel-take";
     private static final String STAT_BATCH_SIZE = "batch-size";
@@ -58,7 +61,8 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
 
     @Override
     public void configure(Context context) {
-        maxSaveBatchSize = context.getInteger("transactionCapacity", DEFAULT_BATCH_SIZE);
+        maxSaveBatchSize = context.getInteger("batch-size", DEFAULT_SAVE_BATCH_SIZE);
+        
         String hosts = context.getString("hosts");
         int port = context.getInteger("port", 9160);
         String clusterName = context.getString("cluster-name");
@@ -80,6 +84,7 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
         repository.setSocketTimeoutMillis(socketTimeoutMillis);
         repository.setMaxConnectionsPerHost(maxConnectionsPerHost);
         repository.setMaxExhaustedWaitMillis(maxExhaustedWaitMillis);
+        repository.setScatterValue(context.getInteger("scatter-value", (int)DEFAULT_SCATTER_VALUE).byteValue());
 
         if (sinkCounter == null) {
             sinkCounter = new SinkCounter(getName());
@@ -207,16 +212,6 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
         this.repository = repository;
     }
 
-    // @Override
-    // public int getLastSaveBatchSize() {
-    // return lastSaveBatchSize;
-    // }
-    //
-    // @Override
-    // public long getLastSaveDurationInMicros() {
-    // return lastSaveDurationInMicros;
-    // }
-
     @Override
     public int getMaxSaveBatchSize() {
         return maxSaveBatchSize;
@@ -250,6 +245,16 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
     @Override
     public int getBatchSizeAvg() {
         return stats.getRollingStat(STAT_BATCH_SIZE).getAverageAmount();
+    }
+
+    @Override
+    public byte getScatterValue() {
+        return repository.getScatterValue();
+    }
+
+    @Override
+    public void setScatterValue(byte scatterValue) {
+        repository.setScatterValue(scatterValue);
     }
 
 }
