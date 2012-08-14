@@ -39,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.cassandra.cli.CliMain;
 import org.apache.flume.Context;
 import org.apache.flume.Event;
+import org.apache.flume.Sink.Status;
 import org.apache.flume.Transaction;
 import org.apache.flume.channel.MemoryChannel;
 import org.apache.flume.conf.Configurables;
@@ -93,12 +94,6 @@ public class TestCassandraSink {
         assertEquals(LifecycleState.IDLE, sink.getLifecycleState());
     }
 
-    // @Test
-    // public void testBadConfiguration()
-    // {
-    // fail();
-    // }
-
     @Test
     public void testProcessing() throws Exception {
         Set<String> hourSet = new HashSet<String>();
@@ -135,6 +130,7 @@ public class TestCassandraSink {
 
         sink.process();
 
+        // make sure we all events are there
         int count = 0;
         for (String ts : hourSet) {
             count += countEvents(ts);
@@ -146,6 +142,67 @@ public class TestCassandraSink {
 
         sink.stop();
         assertEquals(LifecycleState.STOP, sink.getLifecycleState());
+    }
+
+    @Test
+    public void testReadSpeed() throws Exception {
+        Set<String> hourSet = new HashSet<String>();
+        int numEvents = 10000;
+        int maxChannelBatchSize = 200;
+
+        // setup events
+        DateTime baseTime = new DateTime();
+        Transaction transaction = null;
+        for (int i = 0; i < numEvents; i++) {
+            if (0 == i % maxChannelBatchSize) {
+                transaction = channel.getTransaction();
+                transaction.begin();
+            }
+            long ts = baseTime.plusMinutes(i).getMillis() * 1000;
+            String hour = sink.getRepository().getHourFromTimestamp(ts);
+            hourSet.add(hour);
+            String timeAsStr = String.valueOf(ts);
+
+            Map<String, String> headerMap = new HashMap<String, String>();
+            headerMap.put(FlumeLogEvent.HEADER_TIMESTAMP, timeAsStr);
+            headerMap.put(FlumeLogEvent.HEADER_SOURCE, "src1");
+            headerMap.put(FlumeLogEvent.HEADER_HOST, "host1");
+
+            Event event = EventBuilder.withBody(("test event " + i).getBytes(), headerMap);
+            channel.put(event);
+
+            if (0 == (i + 1) % maxChannelBatchSize) {
+                transaction.commit();
+                transaction.close();
+                transaction = null;
+            }
+        }
+
+        if (null != transaction) {
+            transaction.commit();
+            transaction.close();
+        }
+
+        sink.start();
+        assertEquals(LifecycleState.START, sink.getLifecycleState());
+
+        while (Status.READY == sink.process()) {
+            // don't stop, just get it all
+        }
+
+        // make sure we all events are there
+        int readBatchSize = 1000;
+        sink.getRepository().setMaxColumnBatchSize(readBatchSize);
+        long start = System.nanoTime();
+        int count = 0;
+        for (String ts : hourSet) {
+            count += countEvents(ts);
+        }
+        long end = System.nanoTime();
+
+        assertEquals(numEvents, count);
+
+        System.out.println("at " + readBatchSize + " cols/batch : " + (numEvents / (TimeUnit.NANOSECONDS.toSeconds(end - start))) + " events/sec");
     }
 
     @Test
@@ -217,7 +274,7 @@ public class TestCassandraSink {
     @Before
     public void setupTest() throws Exception {
         Context channelContext = new Context();
-        channelContext.put("capacity", "200");
+        channelContext.put("capacity", "10000");
         channelContext.put("transactionCapacity", "200");
 
         channel = new MemoryChannel();

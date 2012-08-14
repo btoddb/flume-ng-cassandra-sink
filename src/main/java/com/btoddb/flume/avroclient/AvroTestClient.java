@@ -254,7 +254,6 @@ public class AvroTestClient implements AvroClientTestMXBean {
                     try {
                         Event event = EventBuilder.withBody(data.getBytes(), headerMap);
                         long start = System.nanoTime();
-                        // check-batch-size
                         rpcClient.append(event);
                         stats.updateRollingStat(STAT_REQUESTS, 1, (System.nanoTime() - start) / 1000);
                         try {
@@ -266,9 +265,10 @@ public class AvroTestClient implements AvroClientTestMXBean {
                         }
                     }
                     catch (EventDeliveryException e) {
+                        logger.error( "exception while using RPC avro client", e);
                         e.printStackTrace();
                         rpcClient.close();
-                        rpcClient = RpcClientFactory.getDefaultInstance(host, port, batchSize);
+                        rpcClient = createRpcClient();
                     }
                 }
             }

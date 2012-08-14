@@ -174,55 +174,7 @@ public class CassandraSinkRepository {
         MultiRowMergeColumnIterator iter = new MultiRowMergeColumnIterator(keyspace, hoursColFamName, keyArr,
                 TimeUUIDComparator.INSTANCE, columnTranslator, maxColumnBatchSize);
         return iter;
-        // MultigetSliceQuery<ByteBuffer, UUID, byte[]> dayQuery = HFactory.createMultigetSliceQuery(keyspace,
-        // ByteBufferSerializer.get(), UUIDSerializer.get(), BytesArraySerializer.get());
-        // dayQuery.setColumnFamily(hoursColFamName);
-        // ByteBuffer[] bbArr = new ByteBuffer[scatterValue];
-        // for (int i = 0; i < scatterValue; i++) {
-        // bbArr[i] = createTimeBasedKey(hour, (byte) i);
-        // }
-        // dayQuery.setKeys(bbArr);
-        // dayQuery.setRange(null, null, false, 100);
-        //
-        // // TODO:BTB - this will need to be paginated
-        // QueryResult<Rows<ByteBuffer, UUID, byte[]>> dayResult = dayQuery.execute();
-        // Rows<ByteBuffer, UUID, byte[]> rows = null != dayResult ? dayResult.get() : null;
-        // if (null == rows) {
-        // return Collections.emptyList();
-        // }
-        //
-        // List<UUID> recordKeyList = createSortedListFromScatteredRows(rows);
-        // return getRecords(recordKeyList);
     }
-
-    // private List<UUID> createSortedListFromScatteredRows(Rows<ByteBuffer, UUID, byte[]> rows) {
-    // if (null == rows) {
-    // return Collections.emptyList();
-    // }
-    //
-    // MultiRowMergeColumnIterator iter = new MultiRowMergeColumnIterator(keyspace, hoursColFamName, keyList,
-    // TimeUUIDComparator.INSTANCE);
-    //
-    // boolean done = false;
-    // while (!done) {
-    // for (Row<ByteBuffer, UUID, byte[]> row : rows) {
-    // ColumnSlice<UUID, byte[]> daySlice = null != row ? row.getColumnSlice() : null;
-    // List<HColumn<UUID, byte[]>> dayColList = null != daySlice ? daySlice.getColumns() : null;
-    // if (null != dayColList && !dayColList.isEmpty()) {
-    // List<UUID> recordKeyList = new ArrayList<UUID>();
-    // for (HColumn<UUID, byte[]> col : dayColList) {
-    // recordKeyList.add(col.getName());
-    // }
-    //
-    // // TODO:BTB - this will need to be done in pages
-    // return getRecords(recordKeyList);
-    // }
-    // else {
-    // return Collections.emptyList();
-    // }
-    // }
-    // }
-    // }
 
     public String getHosts() {
         return hosts;
