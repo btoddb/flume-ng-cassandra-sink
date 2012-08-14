@@ -128,13 +128,15 @@ public class HornetqChannel extends BasicChannelSemantics implements HornetqChan
 
     private void createHornetqServer() {
         synchronized (serverCreateMonitor) {
-            if ( null != server ) {
+            if (null != server) {
                 return;
             }
-            
+
             Configuration config = new ConfigurationImpl();
+            config.setBindingsDirectory(dataDir+"/bindings");
             config.setJournalType(JournalType.NIO); // TODO:BTB use AIO on linux
-            config.setJournalDirectory(dataDir);
+            config.setJournalDirectory(dataDir+"/journal");
+            config.setLargeMessagesDirectory(dataDir+"/large");
             config.setSecurityEnabled(false);
             config.getAcceptorConfigurations().add(new TransportConfiguration(InVMAcceptorFactory.class.getName()));
 
