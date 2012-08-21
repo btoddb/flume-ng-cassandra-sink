@@ -51,6 +51,7 @@ import org.joda.time.format.DateTimeFormatterBuilder;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class TestCassandraSink {
@@ -103,10 +104,10 @@ public class TestCassandraSink {
         List<Event> eventList = new ArrayList<Event>(numEvents);
         DateTime baseTime = new DateTime();
         for (int i = 0; i < numEvents; i++) {
-            long ts = baseTime.plusMinutes(i).getMillis() * 1000;
-            String hour = sink.getRepository().getHourFromTimestamp(ts);
+            long tsInMillis = baseTime.plusMinutes(i).getMillis();
+            String hour = sink.getRepository().getHourFromTimestamp(tsInMillis);
             hourSet.add(hour);
-            String timeAsStr = String.valueOf(ts);
+            String timeAsStr = String.valueOf(tsInMillis*1000);
 
             Map<String, String> headerMap = new HashMap<String, String>();
             headerMap.put(FlumeLogEvent.HEADER_TIMESTAMP, timeAsStr);
@@ -158,10 +159,10 @@ public class TestCassandraSink {
                 transaction = channel.getTransaction();
                 transaction.begin();
             }
-            long ts = baseTime.plusMinutes(i).getMillis() * 1000;
+            long ts = baseTime.plusMinutes(i).getMillis();
             String hour = sink.getRepository().getHourFromTimestamp(ts);
             hourSet.add(hour);
-            String timeAsStr = String.valueOf(ts);
+            String timeAsStr = String.valueOf(ts*1000);
 
             Map<String, String> headerMap = new HashMap<String, String>();
             headerMap.put(FlumeLogEvent.HEADER_TIMESTAMP, timeAsStr);
@@ -244,8 +245,8 @@ public class TestCassandraSink {
         sink.getRepository().setMaxColumnBatchSize(1);
         for (int i = 0; i < eventList.size(); i++) {
             Event event = eventList.get(i);
-            long ts = Long.parseLong(event.getHeaders().get(FlumeLogEvent.HEADER_TIMESTAMP));
-            String cassKey = sink.getRepository().getHourFromTimestamp(ts);
+            long tsInMicros = Long.parseLong(event.getHeaders().get(FlumeLogEvent.HEADER_TIMESTAMP));
+            String cassKey = sink.getRepository().getHourFromTimestamp(tsInMicros/1000);
             Iterator<LogEvent> eventIter = sink.getRepository().getEventsForHour(cassKey);
 
             boolean found = false;

@@ -4,8 +4,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -24,6 +26,7 @@ import org.apache.flume.event.EventBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.btoddb.flume.interceptors.MicrosecondsSyncClockResolution;
 import com.btoddb.flume.sinks.cassandra.FlumeLogEvent;
 import com.btoddb.flume.sinks.cassandra.JmxStatsHelper;
 
@@ -36,11 +39,12 @@ public class AvroTestClient implements AvroClientTestMXBean {
 
     private String host;
     private int port;
-    private int batchSize;
+    private int avroBatchSize;
+    private int clientBatchSize;
     private int iterations;
     private int delay;
     private int numThreads;
-    private String sourceType;
+    private String sourcePrefix;
 
     private MBeanServer mbs;
     private JmxStatsHelper stats;
@@ -51,24 +55,26 @@ public class AvroTestClient implements AvroClientTestMXBean {
     private boolean stopProcessing = false;
     private long start = System.currentTimeMillis();
     private String clientIp;
+    public int maxSourceTypeId = 100;
 
     public AvroTestClient(String[] args) {
         init(args);
     }
 
     private void init(String[] args) {
-        if (7 != args.length) {
+        if (8 != args.length) {
             showUsage();
             System.exit(-1);
         }
 
         host = args[0];
         port = Integer.parseInt(args[1]);
-        batchSize = Integer.parseInt(args[2]);
-        iterations = Integer.parseInt(args[3]);
-        delay = Integer.parseInt(args[4]);
-        numThreads = Integer.parseInt(args[5]);
-        sourceType = args[6];
+        avroBatchSize = Integer.parseInt(args[2]);
+        clientBatchSize = Integer.parseInt(args[3]);
+        iterations = Integer.parseInt(args[4]);
+        delay = Integer.parseInt(args[5]);
+        numThreads = Integer.parseInt(args[6]);
+        sourcePrefix = args[7];
 
         if (null == stats) {
             stats = new JmxStatsHelper(5 * 1000);
@@ -94,7 +100,7 @@ public class AvroTestClient implements AvroClientTestMXBean {
     private void showUsage() {
         System.out.println();
         System.out
-                .println("usage: AvroTestclient <host> <port> <batch-size> <iterations> <delay-in-millis> <num-threads> <src>");
+                .println("usage: AvroTestclient <host> <port> <avro-batch-size> <client-batch-size> <iterations> <delay-in-millis> <num-threads> <src>");
         System.out.println();
     }
 
@@ -186,13 +192,23 @@ public class AvroTestClient implements AvroClientTestMXBean {
     }
 
     @Override
-    public int getBatchSize() {
-        return batchSize;
+    public int getAvroBatchSize() {
+        return avroBatchSize;
     }
 
     @Override
-    public void setBatchSize(int batchSize) {
-        this.batchSize = batchSize;
+    public void setAvroBatchSize(int avroBatchSize) {
+        this.avroBatchSize = avroBatchSize;
+    }
+
+    @Override
+    public int getClientBatchSize() {
+        return clientBatchSize;
+    }
+
+    @Override
+    public void setClientBatchSize(int clientBatchSize) {
+        this.clientBatchSize = clientBatchSize;
     }
 
     @Override
@@ -222,6 +238,7 @@ public class AvroTestClient implements AvroClientTestMXBean {
      */
     class AvroTestTask implements Runnable {
         private int workerId;
+        private int sourceTypeId = 0;
 
         public AvroTestTask(int workerId) {
             this.workerId = workerId;
@@ -231,31 +248,46 @@ public class AvroTestClient implements AvroClientTestMXBean {
         public void run() {
             Thread.currentThread().setName("Test Worker " + workerId);
             RpcClient rpcClient = createRpcClient();
-            Map<String, String> headerMap = new HashMap<String, String>();
-            headerMap.put(FlumeLogEvent.HEADER_SOURCE, sourceType + ":" + String.format("%02d", workerId));
+
+            List<Event> eventList = new ArrayList<Event>(clientBatchSize);
 
             try {
                 while (!stopProcessing) {
+                    eventList.clear();
+
                     if (Thread.interrupted()) {
                         continue;
                     }
 
-                    String data;
-                    try {
-                        data = workQueue.take();
+                    // pull from queue until max batch hit
+                    while (eventList.size() < clientBatchSize && !stopProcessing) {
+                        Map<String, String> headerMap = new HashMap<String, String>();
+                        headerMap.put(FlumeLogEvent.HEADER_SOURCE, String.format("%s:%03d", sourcePrefix, sourceTypeId));
+                        sourceTypeId = (sourceTypeId + 1) % maxSourceTypeId ;
+                        
+                        headerMap.put(FlumeLogEvent.HEADER_TIMESTAMP, String.valueOf(MicrosecondsSyncClockResolution.getInstance().createTimestamp()));
+
+                        String data;
+                        try {
+                            data = workQueue.take();
+                            Event event = EventBuilder.withBody(data.getBytes(), headerMap);
+                            eventList.add(event);
+                        }
+                        catch (InterruptedException e) {
+                            Thread.interrupted();
+                            continue;
+                        }
                     }
-                    catch (InterruptedException e) {
-                        Thread.interrupted();
+
+                    if (stopProcessing) {
                         continue;
                     }
 
-                    numProcessed.incrementAndGet();
-
                     try {
-                        Event event = EventBuilder.withBody(data.getBytes(), headerMap);
                         long start = System.nanoTime();
-                        rpcClient.append(event);
-                        stats.updateRollingStat(STAT_REQUESTS, 1, (System.nanoTime() - start) / 1000);
+                        rpcClient.appendBatch(eventList);
+                        stats.updateRollingStat(STAT_REQUESTS, eventList.size(), (System.nanoTime() - start) / 1000);
+                        numProcessed.addAndGet(eventList.size());
                         try {
                             Thread.sleep(delay);
                         }
@@ -265,7 +297,7 @@ public class AvroTestClient implements AvroClientTestMXBean {
                         }
                     }
                     catch (EventDeliveryException e) {
-                        logger.error( "exception while using RPC avro client", e);
+                        logger.error("exception while using RPC avro client", e);
                         e.printStackTrace();
                         rpcClient.close();
                         rpcClient = createRpcClient();
@@ -279,6 +311,6 @@ public class AvroTestClient implements AvroClientTestMXBean {
     }
 
     public RpcClient createRpcClient() {
-        return RpcClientFactory.getDefaultInstance(host, port, batchSize);
+        return RpcClientFactory.getDefaultInstance(host, port, avroBatchSize);
     }
 }

@@ -105,7 +105,7 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
 
     @Override
     public void start() {
-        repository.initHector();
+        repository.init();
         stats.resetRollingStatsWindow();
         sinkCounter.start();
         super.start();

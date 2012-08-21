@@ -23,10 +23,12 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import me.prettyprint.cassandra.connection.SpeedForJOpTimer;
-import me.prettyprint.cassandra.serializers.ByteBufferSerializer;
 import me.prettyprint.cassandra.service.CassandraHostConfigurator;
 import me.prettyprint.cassandra.service.OperationType;
 import me.prettyprint.cassandra.utils.TimeUUIDUtils;
@@ -42,6 +44,7 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormatterBuilder;
+import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,9 +74,12 @@ public class CassandraSinkRepository {
 
     private static DateTimeFormatter dfHourKey = new DateTimeFormatterBuilder().appendYear(4, 4).appendMonthOfYear(2)
             .appendDayOfMonth(2).appendHourOfDay(2).toFormatter();
+    private static DateTimeFormatter dfIso = ISODateTimeFormat.dateTime();
 
     private static final TimeUnit TIMEUNIT_DEFAULT = TimeUnit.MICROSECONDS;
     private static final Object EMPTY_BYTE_ARRAY = new byte[0];
+
+    private static final int MAX_QUEUED_WORK = 1000;
 
     private TimeUnit timeUnit = TIMEUNIT_DEFAULT;
     private String hosts;
@@ -96,7 +102,13 @@ public class CassandraSinkRepository {
     private Cluster cluster;
     private Keyspace keyspace;
 
-    public void initHector() {
+    private int numWorkThreads = 8;
+    private ExecutorService workExecutor;
+
+    public void init() {
+        workExecutor = new ThreadPoolExecutor(numWorkThreads, numWorkThreads, 20, TimeUnit.MINUTES, new ArrayBlockingQueue<Runnable>(
+                MAX_QUEUED_WORK));
+
         // TODO:btb - go thru these later to be sure they are set correct
         // and properly parameterized by config file
         CassandraHostConfigurator cassConfig = new CassandraHostConfigurator();
@@ -116,30 +128,38 @@ public class CassandraSinkRepository {
 
         cluster = HFactory.createCluster(clusterName, cassConfig, null);
         keyspace = HFactory.createKeyspace(keyspaceName, cluster, CONSISTENCY_LEVEL_POLICY);
-        
+
         columnTranslator = new LogEventColumnTranslator(keyspace, recordsColFamName);
     }
 
     public void saveToCassandra(List<Event> eventList) {
-        Mutator<ByteBuffer> m = HFactory.createMutator(keyspace, ByteBufferSerializer.get());
+        CassandraJob job = new CassandraJob(keyspace, workExecutor);
         for (Event event : eventList) {
             FlumeLogEvent flumeLog = new FlumeLogEvent(event, timeUnit);
 
-            long ts = flumeLog.getTimestamp();
+            long tsInMicros = flumeLog.getTimestampInMicros();
+            long tsInMillis = flumeLog.getTimestampInMillis();
             String src = flumeLog.getSource();
             String host = flumeLog.getHost();
 
-            UUID tsUuid = createTimeUUIDFromTimestamp(ts);
+            UUID tsUuid = createTimeUUIDFromTimestamp(tsInMicros);
+            String tsAsStr = createTimeStampAsString(tsInMillis);
 
             ByteBuffer recordsKey = TimeUUIDUtils.asByteBuffer(tsUuid);
-            m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("ts", ts));
+            
+            job.beginWorkUnit();
+            Mutator<ByteBuffer> m = job.getMutator();
+            m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("ts", tsAsStr));
             m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("src", src));
             m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("host", host));
             m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("data", event.getBody()));
-
-            m.addInsertion(createTimeBasedKey(ts), hoursColFamName, HFactory.createColumn(tsUuid, EMPTY_BYTE_ARRAY));
+            m.addInsertion(createTimeBasedKey(tsInMillis), hoursColFamName,
+                    HFactory.createColumn(tsUuid, EMPTY_BYTE_ARRAY));
+            job.submitWorkUnit();
         }
-        m.execute();
+
+        job.allWorkSubmitted();
+        job.waitUntilFinished();
     }
 
     // time based keys use a "scatter value" to scatter the writes across the cassandra cluster distributing the load
@@ -151,19 +171,23 @@ public class CassandraSinkRepository {
         return bb;
     }
 
-    private ByteBuffer createTimeBasedKey(long timestamp) {
-        String hour = getHourFromTimestamp(timestamp);
-        ByteBuffer bb = createTimeBasedKey(hour, (byte)nextScatter);
-        nextScatter = (byte)((nextScatter + 1) % scatterValue);
+    private ByteBuffer createTimeBasedKey(long tsInMillis) {
+        String hour = getHourFromTimestamp(tsInMillis);
+        ByteBuffer bb = createTimeBasedKey(hour, (byte) nextScatter);
+        nextScatter = (byte) ((nextScatter + 1) % scatterValue);
         return bb;
     }
 
-    public String getHourFromTimestamp(long ts) {
-        return dfHourKey.print(new DateTime(timeUnit.toMillis(ts)).withZone(DateTimeZone.UTC));
+    public String getHourFromTimestamp(long tsInMillis) {
+        return dfHourKey.print(new DateTime(tsInMillis).withZone(DateTimeZone.UTC));
     }
 
-    private UUID createTimeUUIDFromTimestamp(long ts) {
-        return TimeUUIDUtils.getTimeUUID(ts);
+    private UUID createTimeUUIDFromTimestamp(long tsInMicros) {
+        return TimeUUIDUtils.getTimeUUID(tsInMicros);
+    }
+
+    private String createTimeStampAsString(long ts) {
+        return dfIso.print(new DateTime(ts).withZone(DateTimeZone.UTC));
     }
 
     public Iterator<LogEvent> getEventsForHour(String hour) {

@@ -100,7 +100,7 @@ commitlog_directory: target/cassandra/commitlog
 # NOTE: if you reduce the size, you may not get you hottest keys loaded on startup.
 #
 # Default value is empty to make it "auto" (min(5% of Heap (in MB), 100MB)). Set to 0 to disable key cache.
-key_cache_size_in_mb:
+###key_cache_size_in_mb:
 
 # Duration in seconds after which Cassandra should
 # safe the keys cache. Caches are saved to saved_caches_directory as
@@ -111,7 +111,7 @@ key_cache_size_in_mb:
 # has limited use.
 #
 # Default is 14400 or 4 hours.
-key_cache_save_period: 14400
+###key_cache_save_period: 14400
 
 # Number of keys from the key cache to save
 # Disabled by default, meaning all keys are going to be saved
@@ -121,7 +121,7 @@ key_cache_save_period: 14400
 # NOTE: if you reduce the size, you may not get you hottest keys loaded on startup.
 #
 # Default value is 0, to disable row caching.
-row_cache_size_in_mb: 0
+###row_cache_size_in_mb: 0
 
 # Duration in seconds after which Cassandra should
 # safe the row cache. Caches are saved to saved_caches_directory as specified
@@ -132,7 +132,7 @@ row_cache_size_in_mb: 0
 # has limited use.
 #
 # Default is 0 to disable saving the row cache.
-row_cache_save_period: 0
+###row_cache_save_period: 0
 
 # Number of keys from the row cache to save
 # Disabled by default, meaning all keys are going to be saved
@@ -152,7 +152,7 @@ row_cache_save_period: 0
 # that implements org.apache.cassandra.cache.IRowCacheProvider.
 #
 # Defaults to SerializingCacheProvider
-row_cache_provider: SerializingCacheProvider
+###row_cache_provider: SerializingCacheProvider
 
 # saved caches
 saved_caches_directory: target/cassandra/saved_caches
@@ -258,8 +258,8 @@ memtable_flush_queue_size: 4
 # buffers. Enable this to avoid sudden dirty buffer flushing from
 # impacting read latencies. Almost always a good idea on SSD:s; not
 # necessarily on platters.
-trickle_fsync: false
-trickle_fsync_interval_in_kb: 10240
+###trickle_fsync: false
+###trickle_fsync_interval_in_kb: 10240
 
 # TCP port, for commands and data
 storage_port: 7070
@@ -360,7 +360,7 @@ snapshot_before_compaction: false
 # or dropping of column families. The STRONGLY advised default of true 
 # should be used to provide data safety. If you set this flag to false, you will
 # lose data on truncation or drop.
-auto_snapshot: false
+###auto_snapshot: false
 
 # Add column indexes to a row after its contents reach this size.
 # Increase if your column values are large, or if you have a very large
@@ -481,7 +481,8 @@ rpc_timeout_in_ms: 10000
 #
 # You can use a custom Snitch by setting this to the full class name
 # of the snitch, which will be assumed to be on your classpath.
-endpoint_snitch: SimpleSnitch
+###endpoint_snitch: SimpleSnitch
+endpoint_snitch: org.apache.cassandra.locator.SimpleSnitch
 
 # controls how often to perform the more expensive part of host score
 # calculation

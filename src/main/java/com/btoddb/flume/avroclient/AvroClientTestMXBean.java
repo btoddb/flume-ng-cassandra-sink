@@ -8,8 +8,11 @@ public interface AvroClientTestMXBean {
     int getDelay();
     void setDelay(int delayInMillis);
     
-    int getBatchSize();
-    void setBatchSize(int batchSize);
+    int getAvroBatchSize();
+    void setAvroBatchSize(int avroBatchSize);
+    
+    int getClientBatchSize();
+    void setClientBatchSize(int clientBatchSize);
     
     String getHost();
     

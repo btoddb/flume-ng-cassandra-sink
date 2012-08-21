@@ -138,6 +138,7 @@ public class HornetqChannel extends BasicChannelSemantics implements HornetqChan
             config.setJournalDirectory(dataDir+"/journal");
             config.setLargeMessagesDirectory(dataDir+"/large");
             config.setSecurityEnabled(false);
+
             config.getAcceptorConfigurations().add(new TransportConfiguration(InVMAcceptorFactory.class.getName()));
 
             server = new EmbeddedHornetQ();

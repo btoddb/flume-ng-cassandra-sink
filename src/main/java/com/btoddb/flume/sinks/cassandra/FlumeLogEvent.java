@@ -55,7 +55,7 @@ public class FlumeLogEvent {
         return getHeaderMap().containsKey(name);
     }
 
-    public long getTimestamp() {
+    public long getTimestampInMicros() {
         long ts;
         // headers must be stored
         if (containsHeader(HEADER_TIMESTAMP)) {
@@ -67,6 +67,10 @@ public class FlumeLogEvent {
             logger.info("Event is missing '" + FlumeLogEvent.HEADER_TIMESTAMP + "' header - using current time");
         }
         return ts;
+    }
+    
+    public long getTimestampInMillis() {
+        return timeUnit.toMillis(getTimestampInMicros());
     }
 
     public String getSource() {

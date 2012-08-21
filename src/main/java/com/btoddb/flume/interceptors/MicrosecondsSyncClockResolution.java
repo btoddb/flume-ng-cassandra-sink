@@ -25,7 +25,7 @@ public class MicrosecondsSyncClockResolution {
     public long createTimestamp() {
         // The following simulates a microseconds resolution by advancing a static counter
         // every time a client calls the createClock method, simulating a tick.
-        long us = System.currentTimeMillis() * ONE_THOUSAND;
+        long us = System.nanoTime() / ONE_THOUSAND;
         // Synchronized to guarantee unique time within and across threads.
         synchronized (MicrosecondsSyncClockResolution.class) {
             if (us > lastTime) {
