@@ -153,8 +153,8 @@ public class CassandraSinkRepository {
             m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("src", src));
             m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("host", host));
             m.addInsertion(recordsKey, recordsColFamName, HFactory.createColumn("data", event.getBody()));
-            m.addInsertion(createTimeBasedKey(tsInMillis), hoursColFamName,
-                    HFactory.createColumn(tsUuid, EMPTY_BYTE_ARRAY));
+//            m.addInsertion(createTimeBasedKey(tsInMillis), hoursColFamName,
+//                    HFactory.createColumn(tsUuid, EMPTY_BYTE_ARRAY));
             job.submitWorkUnit();
         }
 
