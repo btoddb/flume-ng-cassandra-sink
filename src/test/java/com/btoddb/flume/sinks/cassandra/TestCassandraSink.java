@@ -107,7 +107,7 @@ public class TestCassandraSink {
             long tsInMillis = baseTime.plusMinutes(i).getMillis();
             String hour = sink.getRepository().getHourFromTimestamp(tsInMillis);
             hourSet.add(hour);
-            String timeAsStr = String.valueOf(tsInMillis*1000);
+            String timeAsStr = String.valueOf(tsInMillis * 1000);
 
             Map<String, String> headerMap = new HashMap<String, String>();
             headerMap.put(FlumeLogEvent.HEADER_TIMESTAMP, timeAsStr);
@@ -162,7 +162,7 @@ public class TestCassandraSink {
             long ts = baseTime.plusMinutes(i).getMillis();
             String hour = sink.getRepository().getHourFromTimestamp(ts);
             hourSet.add(hour);
-            String timeAsStr = String.valueOf(ts*1000);
+            String timeAsStr = String.valueOf(ts * 1000);
 
             Map<String, String> headerMap = new HashMap<String, String>();
             headerMap.put(FlumeLogEvent.HEADER_TIMESTAMP, timeAsStr);
@@ -203,7 +203,8 @@ public class TestCassandraSink {
 
         assertEquals(numEvents, count);
 
-        System.out.println("at " + readBatchSize + " cols/batch : " + (numEvents / (TimeUnit.NANOSECONDS.toSeconds(end - start))) + " events/sec");
+        System.out.println("at " + readBatchSize + " cols/batch : "
+                + (numEvents / (TimeUnit.NANOSECONDS.toSeconds(end - start))) + " events/sec");
     }
 
     @Test
@@ -246,7 +247,7 @@ public class TestCassandraSink {
         for (int i = 0; i < eventList.size(); i++) {
             Event event = eventList.get(i);
             long tsInMicros = Long.parseLong(event.getHeaders().get(FlumeLogEvent.HEADER_TIMESTAMP));
-            String cassKey = sink.getRepository().getHourFromTimestamp(tsInMicros/1000);
+            String cassKey = sink.getRepository().getHourFromTimestamp(tsInMicros / 1000);
             Iterator<LogEvent> eventIter = sink.getRepository().getEventsForHour(cassKey);
 
             boolean found = false;
@@ -340,7 +341,9 @@ public class TestCassandraSink {
                         errStream.reset(); // no errors to the end user.
                     }
                     catch (Throwable e) {
-                        e.printStackTrace();
+                        if (sb.toString().startsWith("drop keyspace") && !e.getMessage().endsWith("not found.")) {
+                            e.printStackTrace();
+                        }
                     }
 
                     sb = new StringBuffer();
