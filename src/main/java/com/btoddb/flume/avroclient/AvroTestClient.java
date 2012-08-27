@@ -57,6 +57,8 @@ public class AvroTestClient implements AvroClientTestMXBean {
     private String clientIp;
     public int maxSourceTypeId = 100;
 
+    private Thread mainThread;
+
     public AvroTestClient(String[] args) {
         init(args);
     }
@@ -105,7 +107,8 @@ public class AvroTestClient implements AvroClientTestMXBean {
     }
 
     public void start() throws IOException {
-
+        mainThread = Thread.currentThread();
+        
         //
         // get sample data
         //
@@ -131,7 +134,7 @@ public class AvroTestClient implements AvroClientTestMXBean {
         // setup client headers
         //
 
-        for (int i = 0; i < iterations; i++) {
+        for (int i = 0; !stopProcessing && i < iterations; i++) {
             showStats();
             try {
                 workQueue.put(String.format(dataFormatter, clientIp, Integer.valueOf(i), data));
@@ -141,7 +144,7 @@ public class AvroTestClient implements AvroClientTestMXBean {
             }
         }
 
-        while (numProcessed.get() < iterations) {
+        while (!stopProcessing && numProcessed.get() < iterations) {
             showStats();
             try {
                 Thread.sleep(100);
@@ -154,7 +157,7 @@ public class AvroTestClient implements AvroClientTestMXBean {
         stopProcessing = true;
         execSrvc.shutdownNow();
 
-        System.out.println("finished " + iterations + " iterations");
+        System.out.println("finished " + numProcessed.get() + " iterations");
     }
 
     private void showStats() {
@@ -231,6 +234,8 @@ public class AvroTestClient implements AvroClientTestMXBean {
         this.iterations = iterations;
     }
 
+    // ----------------------
+    
     /**
      * 
      * @author bburruss
@@ -247,7 +252,16 @@ public class AvroTestClient implements AvroClientTestMXBean {
         @Override
         public void run() {
             Thread.currentThread().setName("Test Worker " + workerId);
-            RpcClient rpcClient = createRpcClient();
+            RpcClient rpcClient;
+            try {
+                rpcClient = createRpcClient();
+            }
+            catch (Throwable e) {
+                logger.error("exception while creating Avro RPC client - can't continue", e);
+                stopProcessing = true;
+                mainThread.interrupt();
+                return;
+            }
 
             List<Event> eventList = new ArrayList<Event>(clientBatchSize);
 
@@ -262,10 +276,12 @@ public class AvroTestClient implements AvroClientTestMXBean {
                     // pull from queue until max batch hit
                     while (eventList.size() < clientBatchSize && !stopProcessing) {
                         Map<String, String> headerMap = new HashMap<String, String>();
-                        headerMap.put(FlumeLogEvent.HEADER_SOURCE, String.format("%s:%03d", sourcePrefix, sourceTypeId));
-                        sourceTypeId = (sourceTypeId + 1) % maxSourceTypeId ;
-                        
-                        headerMap.put(FlumeLogEvent.HEADER_TIMESTAMP, String.valueOf(MicrosecondsSyncClockResolution.getInstance().createTimestamp()));
+                        headerMap
+                                .put(FlumeLogEvent.HEADER_SOURCE, String.format("%s:%03d", sourcePrefix, sourceTypeId));
+                        sourceTypeId = (sourceTypeId + 1) % maxSourceTypeId;
+
+                        headerMap.put(FlumeLogEvent.HEADER_TIMESTAMP,
+                                String.valueOf(MicrosecondsSyncClockResolution.getInstance().createTimestamp()));
 
                         String data;
                         try {
