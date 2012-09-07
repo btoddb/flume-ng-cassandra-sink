@@ -135,7 +135,7 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
                 finally {
                     long duration = (System.nanoTime() - channelStartTime) / 1000;
                     logger.debug("take duration (micros) = {}", duration);
-                    stats.updateRollingStat(STAT_TAKE, 1, duration);
+                    stats.addRollingSample(STAT_TAKE, 1, duration);
                 }
                 sinkCounter.incrementEventDrainAttemptCount();
 
@@ -152,7 +152,7 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
             }
 
             if (!eventList.isEmpty()) {
-                stats.updateRollingStat(STAT_BATCH_SIZE, 1, eventList.size());
+                stats.addRollingSample(STAT_BATCH_SIZE, 1, eventList.size());
                 if (eventList.size() == maxSaveBatchSize) {
                     sinkCounter.incrementBatchCompleteCount();
                 }
@@ -166,7 +166,7 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
                     repository.saveToCassandra(eventList);
                 }
                 finally {
-                    stats.updateRollingStat(STAT_SAVE, eventList.size(), (System.nanoTime() - start) / 1000);
+                    stats.addRollingSample(STAT_SAVE, eventList.size(), (System.nanoTime() - start) / 1000);
                 }
 
                 sinkCounter.addToEventDrainSuccessCount(eventList.size());
@@ -220,27 +220,27 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
 
     @Override
     public int getSaveAvgInMicros() {
-        return stats.getRollingStat(STAT_SAVE).getAverageAmount();
+        return stats.getRollingStat(STAT_SAVE).getAverageSample();
     }
 
     @Override
     public int getSavesPerSecond() {
-        return stats.getRollingStat(STAT_SAVE).getCountPerSecond();
+        return stats.getRollingStat(STAT_SAVE).getSamplesPerSecond();
     }
 
     @Override
     public int getTakeAvgInMicros() {
-        return stats.getRollingStat(STAT_TAKE).getAverageAmount();
+        return stats.getRollingStat(STAT_TAKE).getAverageSample();
     }
 
     @Override
     public int getTakesPerSecond() {
-        return stats.getRollingStat(STAT_TAKE).getCountPerSecond();
+        return stats.getRollingStat(STAT_TAKE).getSamplesPerSecond();
     }
 
     @Override
     public int getBatchSizeAvg() {
-        return stats.getRollingStat(STAT_BATCH_SIZE).getAverageAmount();
+        return stats.getRollingStat(STAT_BATCH_SIZE).getAverageSample();
     }
 
 }
