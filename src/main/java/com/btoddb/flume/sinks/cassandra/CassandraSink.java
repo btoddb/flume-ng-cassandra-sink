@@ -45,7 +45,6 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
     private static final String MBEAN_NAME_ROOT = "com.btoddb.flume.sinks.cassandra.CassandraSink:type=";
     private static final int DEFAULT_SAVE_BATCH_SIZE = 100;
 //    private static final int DEFAULT_READ_BATCH_SIZE = 100;
-    private static final byte DEFAULT_SCATTER_VALUE = 10;
 
     private static final String STAT_SAVE = "cass-save";
     private static final String STAT_TAKE = "channel-take";
@@ -67,7 +66,6 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
         int port = context.getInteger("port", 9160);
         String clusterName = context.getString("cluster-name");
         String keyspaceName = context.getString("keyspace-name");
-        String hoursColFamName = context.getString("hours-colfam", "hours");
         String recordsColFamName = context.getString("records-colfam", "records");
         int socketTimeoutMillis = context.getInteger("socket-timeout-millis", 5000);
         int maxConnectionsPerHost = context.getInteger("max-conns-per-host", 2);
@@ -79,12 +77,10 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
         repository.setPort(port);
         repository.setClusterName(clusterName);
         repository.setKeyspaceName(keyspaceName);
-        repository.setHoursColFamName(hoursColFamName);
         repository.setRecordsColFamName(recordsColFamName);
         repository.setSocketTimeoutMillis(socketTimeoutMillis);
         repository.setMaxConnectionsPerHost(maxConnectionsPerHost);
         repository.setMaxExhaustedWaitMillis(maxExhaustedWaitMillis);
-        repository.setScatterValue(context.getInteger("scatter-value", (int)DEFAULT_SCATTER_VALUE).byteValue());
 
         if (sinkCounter == null) {
             sinkCounter = new SinkCounter(getName());
@@ -245,16 +241,6 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
     @Override
     public int getBatchSizeAvg() {
         return stats.getRollingStat(STAT_BATCH_SIZE).getAverageAmount();
-    }
-
-    @Override
-    public byte getScatterValue() {
-        return repository.getScatterValue();
-    }
-
-    @Override
-    public void setScatterValue(byte scatterValue) {
-        repository.setScatterValue(scatterValue);
     }
 
 }

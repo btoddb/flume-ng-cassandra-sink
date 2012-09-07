@@ -2,32 +2,24 @@ package com.btoddb.flume.sinks.cassandra;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.flume.Event;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.btoddb.flume.interceptors.MicrosecondsSyncClockResolution;
 
 public class FlumeLogEvent {
-    private static final Logger logger = LoggerFactory.getLogger(FlumeLogEvent.class);
+//    private static final Logger logger = LoggerFactory.getLogger(FlumeLogEvent.class);
 
     private static final String DEFAULT_SOURCE = "not-set";
     private static final String DEFAULT_HOST = "not-set";
 
+    public static final String HEADER_KEY = "key";
     public static final String HEADER_TIMESTAMP = "timestamp";
     public static final String HEADER_SOURCE = "src";
     public static final String HEADER_HOST = "host";
 
     private final Event event;
 
-    // assume time units coming in from event is of this type. Can be set in constructor.
-    private final TimeUnit timeUnit;
-
-    public FlumeLogEvent(Event event, TimeUnit timeUnit) {
+    public FlumeLogEvent(Event event) {
         this.event = event;
-        this.timeUnit = timeUnit;
     }
 
     public Event getEvent() {
@@ -54,23 +46,9 @@ public class FlumeLogEvent {
     public boolean containsHeader(String name) {
         return getHeaderMap().containsKey(name);
     }
-
-    public long getTimestampInMicros() {
-        long ts;
-        // headers must be stored
-        if (containsHeader(HEADER_TIMESTAMP)) {
-            ts = timeUnit.toMicros(Long.parseLong(getHeader(HEADER_TIMESTAMP)));
-        }
-        else {
-            ts = timeUnit.toMicros(MicrosecondsSyncClockResolution.getInstance().createTimestamp());
-            event.getHeaders().put(HEADER_TIMESTAMP, String.valueOf(ts));
-            logger.info("Event is missing '" + FlumeLogEvent.HEADER_TIMESTAMP + "' header - using current time");
-        }
-        return ts;
-    }
     
-    public long getTimestampInMillis() {
-        return timeUnit.toMillis(getTimestampInMicros());
+    public long getTimestamp() {
+        return Long.parseLong(getHeader(HEADER_TIMESTAMP));
     }
 
     public String getSource() {
@@ -79,6 +57,10 @@ public class FlumeLogEvent {
 
     public String getHost() {
         return containsHeader(FlumeLogEvent.HEADER_HOST) ? getHeader(HEADER_HOST) : DEFAULT_HOST;
+    }
+
+    public String getKey() {
+        return getHeader(HEADER_KEY);
     }
 
 }

@@ -35,11 +35,4 @@ create column family records with
 #     {column_name: host, validation_class: UTF8Type, index_type: KEYS}
 #   ]
 
-
-#create column family hours with
-#   comparator = TimeUUIDType
-#   and gc_grace = 86400
-#;
-
-
 quit;

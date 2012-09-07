@@ -15,16 +15,6 @@ Cassandra Schema
     create column family records with
        comparator = UTF8Type
        and gc_grace = 86400
-       and column_metadata = [
-         {column_name: ts, validation_class: LongType, index_type: KEYS}
-         {column_name: src, validation_class: UTF8Type, index_type: KEYS}
-         {column_name: host, validation_class: UTF8Type, index_type: KEYS}
-       ]
-    ;
-
-    create column family hours with
-       comparator = TimeUUIDType
-       and gc_grace = 86400
     ;
 
 
@@ -55,8 +45,33 @@ Sample Flume config
 
     agent.sinks.cassandraSink.channel = channel1
 
-    agent.sinks.cassandraSink.type = org.apache.flume.sink.cassandra.CassandraSink
+    agent.sinks.cassandraSink.type = com.btoddb.flume.sinks.cassandra.CassandraSink
     agent.sinks.cassandraSink.hosts = localhost
     agent.sinks.cassandraSink.cluster-name = Logging
     agent.sinks.cassandraSink.keyspace-name = logs
     agent.sinks.cassandraSink.max-conns-per-host = 2
+
+Building Cassandra Sink
+-----------------------
+
+The sink is built using Maven
+
+   mvn clean package -P assemble-artifacts
+
+... runs all junits and produces flume-ng-cassandra-sink-1.0.0-SNAPSHOT.jar and
+    flume-ng-cassandra-sink-1.0.0-SNAPSHOT-dist.tar.gz
+
+The tar contains all the dependencies needed, and then some.  See the list below regarding what is actually needed
+to use the sink in the flume environment.
+
+Required Dependencies
+---------------------
+
+flume-ng-cassandra-sink*.jar
+hector-core*
+guava*
+speed4j*
+uuid*
+libthrift*
+cassandra-thrift*
+

@@ -13,6 +13,4 @@ public interface CassandraSinkMXBean {
 	
     int getBatchSizeAvg();
     
-    byte getScatterValue();
-    void setScatterValue(byte scatterValue);
 }
