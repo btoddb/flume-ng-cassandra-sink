@@ -17,7 +17,7 @@ import me.prettyprint.hector.api.mutation.Mutator;
 public class CassandraJob implements CassandraWorkStatus {
     private ExecutorService workExec;
     private Set<CassandraWriteWork> workSet = new HashSet<CassandraWriteWork>();
-    private int maxUnitsPerCommit = 250;
+    private int maxUnitsPerCommit = 100;
     private int count = 0;
     private CassandraWriteWork work;
     private Keyspace keyspace;
