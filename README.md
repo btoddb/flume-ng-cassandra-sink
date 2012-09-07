@@ -19,7 +19,7 @@ Cassandra Schema
 
 
 Sample Flume config
--------------
+-------------------
 
     agent.sources = avrosource
     agent.channels = channel1
@@ -67,7 +67,6 @@ to use the sink in the flume environment.
 Required Dependencies
 ---------------------
 
-* flume-ng-cassandra-sink*.jar
 * hector-core*
 * guava*
 * speed4j*
