@@ -67,11 +67,11 @@ to use the sink in the flume environment.
 Required Dependencies
 ---------------------
 
-flume-ng-cassandra-sink*.jar
-hector-core*
-guava*
-speed4j*
-uuid*
-libthrift*
-cassandra-thrift*
+* flume-ng-cassandra-sink*.jar
+* hector-core*
+* guava*
+* speed4j*
+* uuid*
+* libthrift*
+* cassandra-thrift*
 
