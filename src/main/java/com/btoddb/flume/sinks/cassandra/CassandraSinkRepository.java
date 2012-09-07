@@ -44,7 +44,7 @@ import org.joda.time.format.ISODateTimeFormat;
 public class CassandraSinkRepository {
     // private static final Logger logger = LoggerFactory.getLogger(CassandraSinkRepository.class);
 
-    // all reads/writes for cached data are ONE, meta reads/writes are at quorum
+    // all reads/writes for data are ONE, meta reads/writes are at quorum
     private static final ConsistencyLevelPolicy CONSISTENCY_LEVEL_POLICY = new ConsistencyLevelPolicy() {
         @Override
         public HConsistencyLevel get(OperationType op, String cfName) {
