@@ -34,6 +34,11 @@ The records column family is keyed by 'src' + 'key' and will contain all the log
 Cassandra Schema
 ----------------
 
+The following is an example schema, but of course the problem is not how to get data into Cassandra.
+It is how to get data out!  Unless you will only be retrieving logs by Cassandra row key, you will
+probably want to add some secondary indices or use DataStax Enterprise Search
+with its SOLR capabilities.
+
     create keyspace logs with
        strategy_options = {datacenter1:1}
     ;
