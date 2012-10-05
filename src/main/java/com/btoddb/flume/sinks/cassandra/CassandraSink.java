@@ -64,8 +64,8 @@ public class CassandraSink extends AbstractSink implements Configurable, Cassand
         
         String hosts = context.getString("hosts");
         int port = context.getInteger("port", 9160);
-        String clusterName = context.getString("cluster-name");
-        String keyspaceName = context.getString("keyspace-name");
+        String clusterName = context.getString("cluster-name", "Logging");
+        String keyspaceName = context.getString("keyspace-name", "logs");
         String recordsColFamName = context.getString("records-colfam", "records");
         int socketTimeoutMillis = context.getInteger("socket-timeout-millis", 5000);
         int maxConnectionsPerHost = context.getInteger("max-conns-per-host", 2);
