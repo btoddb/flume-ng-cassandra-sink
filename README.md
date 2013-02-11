@@ -72,9 +72,12 @@ Sample Flume config
     agent.sources.avrosource.interceptors.addTimestamp.type = org.apache.flume.interceptor.TimestampInterceptor$Builder
 
     # Cassandra flow
-    agent.channels.channel1.type = FILE
-    agent.channels.channel1.checkpointDir = file-channel1/check
-    agent.channels.channel1.dataDirs = file-channel1/data
+    agent.channels.channel1.type = memory
+    agent.channels.channel1.capacity = 1000
+    ###agent.channels.channel1.type = FILE
+    ###agent.channels.channel1.checkpointDir = file-channel1/check
+    ###agent.channels.channel1.dataDirs = file-channel1/data
+
 
     agent.sinks.cassandraSink.channel = channel1
 

@@ -18,26 +18,19 @@
 
 package com.btoddb.flume.sinks.cassandra;
 
-import java.lang.management.ManagementFactory;
-import java.util.LinkedList;
-import java.util.List;
-
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
-
 import me.prettyprint.hector.api.exceptions.HectorException;
-
-import org.apache.flume.Channel;
-import org.apache.flume.ChannelException;
-import org.apache.flume.Context;
-import org.apache.flume.Event;
-import org.apache.flume.EventDeliveryException;
-import org.apache.flume.Transaction;
+import org.apache.flume.*;
 import org.apache.flume.conf.Configurable;
 import org.apache.flume.instrumentation.SinkCounter;
 import org.apache.flume.sink.AbstractSink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+import java.lang.management.ManagementFactory;
+import java.util.LinkedList;
+import java.util.List;
 
 public class CassandraSink extends AbstractSink implements Configurable, CassandraSinkMXBean {
     private static final Logger logger = LoggerFactory.getLogger(CassandraSink.class);
