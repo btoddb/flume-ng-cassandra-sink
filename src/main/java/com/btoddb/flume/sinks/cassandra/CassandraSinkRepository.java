@@ -19,6 +19,7 @@ package com.btoddb.flume.sinks.cassandra;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -109,7 +110,7 @@ public class CassandraSinkRepository {
 
     }
 
-    public void saveToCassandra(List<Event> eventList) {
+    public void saveToCassandra(List<Event> eventList) throws InterruptedException, ExecutionException{
         CassandraJob job = new CassandraJob(keyspace, workExecutor);
         for (Event event : eventList) {
             FlumeLogEvent flumeLog = new FlumeLogEvent(event);
