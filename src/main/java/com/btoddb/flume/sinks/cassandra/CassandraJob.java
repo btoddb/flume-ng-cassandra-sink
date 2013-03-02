@@ -19,7 +19,9 @@ package com.btoddb.flume.sinks.cassandra;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 import me.prettyprint.hector.api.Keyspace;
 import me.prettyprint.hector.api.mutation.Mutator;
@@ -69,7 +71,7 @@ public class CassandraJob implements CassandraWorkStatus {
         }
     }
 
-    public void allWorkSubmitted() {
+    public void allWorkSubmitted() throws InterruptedException, ExecutionException{
         submitWork();
     }
 
@@ -83,17 +85,20 @@ public class CassandraJob implements CassandraWorkStatus {
         // }
     }
 
-    public void submitWorkUnit() {
+    public void submitWorkUnit() throws InterruptedException, ExecutionException{
         if (0 == ++count % maxUnitsPerCommit) {
             submitWork();
         }
     }
 
-    private void submitWork() {
+    private void submitWork() throws InterruptedException, ExecutionException{
         if (null != work) {
             workSet.add(work);
-            workExec.submit(work);
+            Future<?> future = workExec.submit(work);
             work = null;
+            //future's get method will help in propagating the exception if the 
+            // task has failed.
+            future.get();
         }
     }
 
