@@ -32,11 +32,12 @@ import me.prettyprint.hector.api.mutation.Mutator;
  */
 public class CassandraJob implements CassandraWorkStatus {
     private ExecutorService workExec;
-    private Set<CassandraWriteWork> workSet = new HashSet<CassandraWriteWork>();
+    private final Set<CassandraWriteWork> workSet = new HashSet<CassandraWriteWork>();
     private int maxUnitsPerCommit = 100;
     private int count = 0;
     private CassandraWriteWork work;
     private Keyspace keyspace;
+    private CassandraJobWorkException lastException;
 
     public CassandraJob(Keyspace keyspace, ExecutorService workExec) {
         this.keyspace = keyspace;
@@ -48,6 +49,10 @@ public class CassandraJob implements CassandraWorkStatus {
         synchronized (workSet) {
             if (!workSet.remove(work)) {
                 throw new IllegalStateException("Could not find 'work' in write work set.  This should never happen!!");
+            }
+
+            if ( !work.isSuccess() ) {
+                lastException = work.getException();
             }
 
             if (workSet.isEmpty()) {
@@ -66,10 +71,15 @@ public class CassandraJob implements CassandraWorkStatus {
                     Thread.interrupted();
                 }
             }
+
+            if ( null != lastException ) {
+                throw lastException;
+            }
         }
     }
 
     public void allWorkSubmitted() {
+        // make sure submit any partial work
         submitWork();
     }
 

@@ -173,6 +173,11 @@ public class TestCassandraSink {
         assertEquals(LifecycleState.STOP, sink.getLifecycleState());
     }
 
+    @Test
+    public void testWorkException() {
+
+    }
+
     // ----------------------
 
     private void checkCass(List<Event> eventList) {

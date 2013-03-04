@@ -31,6 +31,8 @@ public class CassandraWriteWork implements Runnable {
     
     Mutator<ByteBuffer> mutator;
     private CassandraWorkStatus callback;
+    private boolean success = false;
+    private CassandraJobWorkException exception;
 
     public CassandraWriteWork(Keyspace keyspace, CassandraWorkStatus callback) {
         this.callback = callback;
@@ -41,9 +43,12 @@ public class CassandraWriteWork implements Runnable {
     public void run() {
         try {
             mutator.execute();
+            success = true;
         }
         catch (Throwable e) {
             logger.error("exception while executing mutator", e);
+            exception = new CassandraJobWorkException("uncaught exeception while executing mutation", e);
+            success = false;
         }
         callback.finished(this);
     }
@@ -51,4 +56,13 @@ public class CassandraWriteWork implements Runnable {
     public Mutator<ByteBuffer> getMutator() {
         return mutator;
     }
+
+    public CassandraJobWorkException getException() {
+        return exception;
+    }
+
+    public boolean isSuccess() {
+        return success;
+    }
+
 }
